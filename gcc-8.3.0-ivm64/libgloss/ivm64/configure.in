@@ -1,0 +1,80 @@
+dnl This is the newlib/libc/sys/ivm64 configure.in file.
+dnl Process this file with autoconf to produce a configure script.
+
+AC_PREREQ(2.59)
+AC_INIT(libivm64sys,0.0.1)
+
+dnl AC_CONFIG_HEADER(config.h)
+
+# No shared libraries allowed
+if test "${enable_shared}" = "yes" ; then
+    echo "Shared libraries not supported for cross compiling, ignored"
+fi
+
+AC_CANONICAL_TARGET
+
+AC_ARG_PROGRAM
+AC_PROG_INSTALL
+
+AC_DEFINE(HAVE_GNU_LD, 0, [Using GNU ld])
+# We always use ELF, define various useful associated things.
+AC_DEFINE(HAVE_ELF, 1, [Using ELF format])
+
+# Where are the auxillary tools (confg.sub etc)?
+if test "$srcdir" = "." ; then
+  if test "${with_target_subdir}" != "." ; then
+    libgloss_topdir="${srcdir}/${with_multisrctop}../../.."
+  else
+    libgloss_topdir="${srcdir}/${with_multisrctop}../.."
+  fi
+else
+  libgloss_topdir="${srcdir}/../.."
+fi
+AC_CONFIG_AUX_DIR($libgloss_topdir)
+
+AC_CACHE_CHECK([for symbol prefix], libc_cv_symbol_prefix, [dnl
+cat > conftest.c <<\EOF
+foo () { }
+EOF
+dnl
+libc_cv_symbol_prefix=none
+if AC_TRY_COMMAND([${CC-cc} -S conftest.c -o - | fgrep "\$foo" > /dev/null]);
+then
+  libc_cv_symbol_prefix='$'
+else
+  if AC_TRY_COMMAND([${CC-cc} -S conftest.c -o - | fgrep "_foo" > /dev/null]);
+  then
+    libc_cv_symbol_prefix=_
+  fi
+fi
+rm -f conftest* ])
+if test $libc_cv_symbol_prefix != none; then
+  AC_DEFINE_UNQUOTED(__SYMBOL_PREFIX, "$libc_cv_symbol_prefix")
+else
+  AC_DEFINE(__SYMBOL_PREFIX, "")
+fi
+
+host_makefile_frag=${srcdir}/../config/default.mh
+target_makefile_frag=${srcdir}/../config/default.mt
+
+dnl We have to assign the same value to other variables because autoconf
+dnl doesn't provide a mechanism to substitute a replacement keyword with
+dnl arbitrary data or pathnames.
+dnl
+host_makefile_frag_path=$host_makefile_frag
+AC_SUBST(host_makefile_frag_path)
+AC_SUBST_FILE(host_makefile_frag)
+target_makefile_frag_path=$target_makefile_frag
+AC_SUBST(target_makefile_frag_path)
+AC_SUBST_FILE(target_makefile_frag)
+
+AC_CONFIG_FILES(Makefile,
+. ${libgloss_topdir}/config-ml.in,
+srcdir=${srcdir}
+target=${target}
+with_multisubdir=${with_multisubdir}
+ac_configure_args="${ac_configure_args} --disable-multilib"
+CONFIG_SHELL=${CONFIG_SHELL-/bin/sh}
+libgloss_topdir=${libgloss_topdir}
+)
+AC_OUTPUT

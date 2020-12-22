@@ -1,0 +1,47 @@
+/* Machine modes for the ivm64 target
+
+   GCC is free software; you can redistribute it and/or modify it
+   under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3, or (at your option)
+   any later version.
+
+   GCC is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with GCC; see the file COPYING3.  If not see
+   <http://www.gnu.org/licenses/>.  */
+
+/*  GNU Compiler Collection (GCC) Internals:
+
+    The following 3 variables are defined on every target. They can be used to
+    allocate buffers that are guaranteed to be large enough to hold any value that
+    can be represented on the target.
+
+    The first two can be overridden by defining them in the target’s mode.def file, 268
+    however, the value must be a constant that can determined very early in the
+    compilation process.
+
+    The third symbol cannot be overridden.
+
+    BITS_PER_UNIT
+    The number of bits in an addressable storage unit (byte). If you do not define
+    this, the default is 8.
+
+    MAX_BITSIZE_MODE_ANY_INT
+    The maximum bitsize of any mode that is used in integer math. This should be
+    overridden by the target if it uses large integers as containers for larger
+    vectors but otherwise never uses the contents to compute integer values.
+
+    MAX_BITSIZE_MODE_ANY_MODE
+    The bitsize of the largest mode on the target. The default value is the largest
+    mode size given in the mode definition file, which is always correct for
+    targets whose modes have a fixed size. Targets that might increase the size of
+    a mode beyond this default should define MAX_BITSIZE_MODE_ANY_MODE to the
+    actual upper limit in ‘machine-modes.def’.  */
+
+/* Number of bits in an addressable storage unit. */
+#undef BITS_PER_UNIT
+#define BITS_PER_UNIT 8
