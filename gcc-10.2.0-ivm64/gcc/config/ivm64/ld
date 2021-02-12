@@ -1,0 +1,929 @@
+#!/bin/bash
+
+# Preservation Virtual Machine Project
+#
+# Simple assembly-level linker for GNU CC compiler ivm64 target
+# To replace Unix's linker 'ld', simply by renaming local
+# labels in each module to make them unique and concatenating
+# all object files together
+#
+# Authors:
+#  Eladio Gutierrez Carrasco
+#  Sergio Romero Montiel
+#  Oscar Plata Gonzalez
+#
+# Date: Oct-Dec 2019 - Jan 2021
+
+# Expected syntax:
+#
+#    ld [normal link options (ignored)] [-o outfile] [-L libdir] [-lname] [-e entry] objfiles
+#
+# There can be several '-L' options if more than one
+# library directories are to be included.
+# If no '-o' option output file will be 'a.out'.
+# If the output file has no extension '.S' nor '.o', an
+# "executable assembly" is created prepending a shebang preamble
+# in charge of assembling and emulating the code by
+# calling the emulator "ivm"
+
+# Other options:
+# --verbose
+#      show extra information about the linking process.
+#      Use as:
+#           ld --verbose ....
+#       or from the driver:
+#           ivm64-gcc -Xlinker --verbose ...
+#
+# -mdce / -mno-dce
+#      Enable/disable DEAD CODE ELIMINATION at library object level
+#      It is enabled by default
+#
+# --ivm64-trace, -mtrace
+#      add a label to each instruction when generating an assembly
+#      executable (extension other than .S/.o); this breaks all
+#      basic blocks, preventing the emulator from optimizing the assembly.
+#      To be deprecated as we have "ivm --noopt" to disable emulation
+#      optimizations.
+#      Use as:
+#           ld --ivm64-trace ...
+#       or from the driver:
+#           ivm64-gcc -Xlinker --ivm64-trace ...
+#
+# -mcrt0, -mno-crt0
+#      force to prepend or not a startup sequence (crt0) when
+#      generating an executable.
+#      By default, it is not prepended because crt0.o is commonly
+#      passed by the driver.
+#      But it can be useful when gcc is invoked  with -nostdlib
+#      or -nostartfiles
+#      Example:
+#           ivm64-gcc -Xlinker -mcrt0 -nostartfiles ...
+#      It uses the startup file crt0.S if available; otherwise a startup
+#      sequence if generated
+
+# File extension convention:
+#   .s -> assembly (from c source)
+#   .S -> assembly (precompiled libraries or modules, startup files,...)
+#   .o -> object (actually containing assembly)
+#   .a -> ar file containing objects
+
+# Examples:
+#   - Generate several assembly files from c sources:
+#       ivm64-gcc -S file1.c file2.c ...
+#
+#   - Compile generating objects from c sources:
+#       ivm64-gcc -c fle1.c file2.c ...
+#
+#   - Link several c sources and/or objects in one unique "executable" assembly:
+#       ivm64-gcc main.c mod1.c mod2.c obj1.o obj2.o ... -o a.out.s
+#
+#   - Precompile a library including objects from several c sources:
+#       ivm64-gcc lib-fun1.c lib-fun2.c -o lib.S
+#
+#   - Build a library by compiling the objects and then archiving them:
+#       ivm64-gcc -c lib-fun1.c lib-fun2.c ... # Generate all .o
+#       ar r lib.a lib-fun1.o lib-fun2.o ...
+#
+#   - Link c sources with precompiled assembly libraries:
+#       ivm64-gcc main.c lib1.S lib2.S -o a.out.s
+#
+#   - Compile c sources and link with ar/obj/assembly files:
+#       ivm64-gcc main.c lib1.a lib2.S mod3.o -o a.out.s
+#
+#   - Both -L/-l flags can be used; for example, linking with libmy.a in /path/to:
+#       ivm64-gcc main.c -L/path/to/ -lmy -o a.out.s
+
+# The resulting "executable" can be executed thanks to a
+# shebang preamble. To do this, the ivm implementation (ivm) is required to be
+# in PATH. Also an alternative simulator (IVM_EMU), and a memory limit (IVM_MAXMEM)
+# can be set.
+#
+# Examples:
+#   you can run this file ('ivm run' used by default emulator):
+#      ./a.out
+#   using your favourite ivm emulator:
+#      IVM_EMU=ivm_emu_fast ./a.out
+#   passing arguments:
+#      IVM_EMU=ivm_emu_fast ./a.out 1 2 3
+#   setting the memory size:
+#      IVM_MAXMEM=100000000 IVM_EMU=ivm_emu_fast ./a.out
+
+# This script processes assembly on a line basis, so that codes
+# are subjected to the following conventions:
+#
+#   - One and only instruction per line
+#      Supported:             Not supported:
+#          push! 3              push! 3 push! 4
+#          push! 4
+#
+#          push! 5              push!
+#                                     5
+#
+#   - Label/Alias declaration: alone and in one only line
+#      Supported:             Not supported:
+#          main:                main
+#                                    :
+#
+#          var:                 var: data1 [0]
+#               data1 [0]
+#
+#   - Data declarations must be in one only line
+#      Supported:             Not supported:
+#          data1 [0 0 0 0]      data1 [0 0
+#                                      0 0]
+#
+
+export LANG=C
+export LC_ALL=C
+
+# Set to something to force verbose mode
+# VERBOSE is exported in "as" as well as the "verbose" function
+export VERBOSE=
+
+# To avoid problems with terminal escape codes (color)
+export GREP_OPTIONS=
+
+#---------------------------------------------------
+#  Check the requirements to run ld: bash version,
+#   and other utils programs (grep, ar, gawk,...)
+#  Usage:
+#         check_requirements
+#---------------------------------------------------
+#  Rename local labels of a file containing ivm64
+#  assembly to make them uniq
+#  The "locallized" file is printed to stdout
+#  Usage:
+#         locallize filename suffix
+#---------------------------------------------------
+# These functions are defined in the "as" script
+#---------------------------------------------------
+. $(dirname "$0")/as -mquit
+
+# Default output file (the "executable")
+export OUTFILEDEF=a.out
+OUTFILE=$OUTFILEDEF
+
+# A temporary file
+export OUTPUTTMP="${OUTPUT}___tmp${RANDOM}"
+
+# Assembly files must contain some comment like "#GCC Cross Compiler for ivm64"
+# This regex should be tested case insensitive
+export IVM64MAGIC="gcc.*ivm64\|ivm64.*generated.*ld"
+
+# A script shebang to convert the output into an assembly executable,
+# that can execute itself by calling ivm (ivm must be in the PATH)
+# - Use END awk rule to execute ivm only once, not per line
+# - Copy file with .s extension because ivm only accept this extension
+# - Interchange ivm's stderr and stdout, as ivm print chars to stderr
+# - the TOS after simulation is used as return value of the script
+# - if defined IVM_EMU, use it as simulator, otherwise simulate with 'ivm run'
+# - if defined IVM_MAXMEM, use it as memory size, otherwise use 65536 bytes
+# Using 'EOF' with quotes the input is verbatim, and variables in the heredoc are not expanded
+read -d '' IVMSHEBANG << 'EOF'
+#!/usr/bin/gawk BEGIN{FS="^##:ivm64:"} $0~FS{c=$2;gsub("!FN!",FILENAME,c);r=system(c)} (NR>1)&&(r||($0!~FS)){exit r}
+##:ivm64: #
+##:ivm64: # you can run this file:
+##:ivm64: #     ./a.out
+##:ivm64: # using your favourite ivm emulator:
+##:ivm64: #     IVM_EMU=ivm_emu_fast ./a.out
+##:ivm64: # passing arguments:
+##:ivm64: #     IVM_EMU=ivm_emu_fast ./a.out 1 2 3
+##:ivm64: # setting the memory size
+##:ivm64: #     IVM_MAXMEM=100000000 IVM_EMU=ivm_emu_fast ./a.out
+##:ivm64: # setting the memory size and selecting output/input directory:
+##:ivm64: #     IVM_MAXMEM=100000000 IVM_OUTDIR=/tmp IVM_INDIR=/tmp/in IVM_EMU=ivm_emu_fast ./a.out
+##:ivm64: #         or
+##:ivm64: #     export IVM_EMU=ivm_emu_fast
+##:ivm64: #     export IVM_MAXMEM=100000000
+##:ivm64: #     export IVM_OUTDIR=/tmp
+##:ivm64: #     export IVM_INDIR=/tmp/in
+##:ivm64: #     ./a.out 1 2 3
+##:ivm64: # next lines are executed by /bin/sh
+##:ivm64: if ! which ivm > /dev/null 2>/dev/null; then echo "Can't execute: application 'ivm' not found in PATH" ; exit 254; fi
+##:ivm64: ivm | gawk 'BEGIN{MAJOR=0; MINOR=25} {match($0, /v([0-9]+)\.([0-9]+)/,  a); if ((a[1]<MAJOR) || (a[1]==MAJOR && a[2]<MINOR)) {print "ivm v" MAJOR "." MINOR " or greater required"; exit 254} }'
+##:ivm64: F="!FN!"; ivm as --bin "${F}.b" --sym "${F}.sym" "${F}" 3>&2 2>&1 1>&3 # Create binary file
+##:ivm64: (if which "${IVM_EMU}" > /dev/null; then echo "Simulating with IVM_EMU=$IVM_EMU"; else echo "IVM_EMU not set or simulator not found; using 'ivm run'"; fi) 3>&2 2>&1 1>&3
+##:ivm64: trap 'rm -f !FN!_cmd_' EXIT HUP INT TERM QUIT; export F="!FN!"; if ! which "${IVM_EMU}" > /dev/null; then IVM_EMU="ivm run"; fi; ARG_FILE=/proc/$PPID/cmdline; ARG_FILE_OPT=; if test -f "$ARG_FILE"; then cut -d '' -f 3- $ARG_FILE | tr -d $'\\n' > !FN!_cmd_; ARG_FILE_OPT="-a !FN!_cmd_"; fi; OUT_DIR_OPT=; test -d "$IVM_OUTDIR" && OUT_DIR_OPT="-o $IVM_OUTDIR";  IN_DIR_OPT=; test -d "$IVM_INDIR" && IN_DIR_OPT="-i $IVM_INDIR"; (echo; ${IVM_EMU} ${OUT_DIR_OPT} ${IN_DIR_OPT} ${ARG_FILE_OPT} -m ${IVM_MAXMEM:-67108864} "${F}.b") 3>&2 2>&1 1>&3; S=$?; exit $S
+##:ivm64: exit 0
+##
+EOF
+
+# To abort inside functions sending USR1 to itself (kill -USR1 $$)
+trap 'exit 2' USR1
+
+#---------------------------------------------------
+#  Process argument list and invoke the link function
+#---------------------------------------------------
+main(){
+    LDARGS="$@"
+    OBJFILES=
+    ARFILES=
+    OTHERS=
+    LIBDIRS=
+    ARTMPDIRS=
+    IVM64TRACE=
+    CRT0S=
+    DCE=1
+
+    ARTMPDIR=`mktemp -d`
+    SOTMPDIR=`mktemp -d`
+    chmod go-wrx $ARTMPDIR $SOTMPDIR
+
+    # Program the deletion of temporary dirs; it doesn't work on kill -9
+    trap 'cd /tmp/; ! test -z "$ARTMPDIR" && rm -rf $ARTMPDIR; ! test -z "$SOTMPDIR" && rm -rf $SOTMPDIR; test -f "$OUTPUTTMP" && rm -f "$OUTPUTTMP" ' EXIT HUP INT TERM QUIT
+
+    # First, process library paths to get them in advance
+    ARGS2=()
+    while test $# -gt 0
+    do
+        if test "$1" == "-L"
+        then
+            shift
+            set LIBDIRS="$LIBDIRS $1"
+        elif [[ "$1" =~ ^-L.+ ]]
+        then
+            LIBDIRS="$LIBDIRS ${1/-L/}"
+        elif [[ "$1" =~ --verbose(=|$) ]]
+        then
+            VERBOSE=1
+            OTHERS="$OTHERS $1"
+        elif [[ "$1" =~ -mdce ]]
+        then
+            DCE=1
+        elif [[ "$1" =~ -mno-dce ]]
+        then
+            DCE=
+        else
+            ARGS2+=("$1")
+        fi
+        shift
+    done
+
+    set -- "${ARGS2[@]}"
+
+    verbose && >&2 echo "ivm64-ld ----------------------------------------"
+
+    # Process the remainder options
+    nopt=0
+    nso=0
+    while test $# -gt 0
+    do
+        if test "$1" == "-o"
+        then
+            shift
+            OUTFILE="$1"
+        elif [[ "$1" =~ ^-l.+ ]] # Check -lsomething
+        then
+            libfilename="lib${1/-l/}"
+            # For -lX search libX.a in the library path list so far
+            libfile="${libfilename}.a"
+            libfile=$(in_path_list "$libfile" "$LIBDIRS")
+            if ! test -z "$libfile"; then
+                # Add the lib file to the argument list
+                set -- "$@" "$libfile"
+            else
+                # If libX.a not found, try libX.so
+                libfile="${libfilename}.so"
+                libfile=$(in_path_list "$libfile" "$LIBDIRS")
+                if ! test -z "$libfile"; then
+                    # Add the lib file to the argument list
+                    set -- "$@" "$libfile"
+                else
+                    >&2 echo "Neither '$libfilename.a' nor '$libfilename.so' found"
+                    kill -USR1 $$
+                fi
+            fi
+        elif test "$1" == "--ivm64-trace" || test "$1" == "-mtrace"
+        then
+            IVM64TRACE="-t"
+            OTHERS="$OTHERS $1"
+        elif test "$1" == "-mcrt0"
+        then
+            CRT0S=$1
+            OTHERS="$OTHERS $1"
+        elif test "$1" == "-mno-crt0"
+        then
+            CRT0S=
+            OTHERS="$OTHERS $1"
+        elif test "$1" == "-e"
+        then
+            shift
+            ENTRY="-e $1"
+            OTHERS="$OTHERS -e $1"
+        elif [[ "$1" =~ ^-.+ ]]
+        then
+            OTHERS="$OTHERS [$1]"
+        else
+            # Create the list of files to link, or extract objects
+            # in libraries if appropiate
+            if is_ar "$1"; then
+                # It is an ar file
+                ARFILES="$ARFILES $1"
+                if test -z "$DCE"
+                then
+                    arfile=`readlink -f "$1"`
+                    if pushd $ARTMPDIR >/dev/null; then
+                        ar x "$arfile"
+                        popd >/dev/null
+                    fi
+                fi
+            elif has_extension "$1" 'so[.0-9]*'; then
+                # It is a shared object file (.so, .so.1.1.0, ...)
+                sofile=`readlink -f "$1"`
+                if pushd $SOTMPDIR >/dev/null; then
+                    csplit -f "so${nso}xx" -b '04%d.o' "$sofile" '/^##:ivm64:obj-id:/' '{*}' >& /dev/null
+                    popd >/dev/null
+                fi
+                let nso=nso+1
+                true
+            else
+                # It should be an assembly or object file
+                OBJFILES="$OBJFILES $1"
+            fi
+        fi
+        shift
+        let nopt=nopt+1
+    done
+
+    # If there are "ar" libraries or some share objects have been splitted
+    if ! test -z "$ARFILES" || test $nso -gt 0
+    then
+        if test -z "$DCE"
+        then
+            # No DCE: link all the objects in the libraries
+            OBJFILES="${OBJFILES} $(find ${ARTMPDIR}/ -type f 2>/dev/null) $(find ${SOTMPDIR}/ -type f 2>/dev/null)"
+        else
+            # DCE: link only required objects from the libraries
+            export DCETEMPDIR=$ARTMPDIR
+            MINIMALOBJS=`dce_do $ARFILES $SOTMPDIR/ -- $OBJFILES`
+            OBJFILES="${OBJFILES} ${MINIMALOBJS}"
+        fi
+    fi
+
+    # Keep only one instance of files with the same contents
+    # ignoring duplicates
+    OBJFILES=`md5sum $OBJFILES | gawk '!uniq[substr($0,1,32)]++{print $2}'`
+
+    verbose && (
+    echo   "ld summary:"
+    (
+    echo   "  Args:            $LDARGS"
+    echo   "  Outfile:         $OUTFILE"
+    echo   "  Ar files:        $ARFILES"
+    echo   "  Obj files:       $OBJFILES"
+    echo   "  Lib dirs:        $LIBDIRS"
+    echo   "  Other options:   $OTHERS"
+    echo   "  Files to link:   $OBJFILES " ) | sed 's/: */,|,/g' | column -s "," -t) >&2
+
+    ivm64_link  ${OBJFILES} -o "${OUTFILE}" "${IVM64TRACE}" "${CRT0S}" ${ENTRY}
+}
+
+#---------------------------------------------------
+#  Link a list of object/assembly files
+#  by renaming local labels in each file to make them
+#  unique and then concatenating  all objects together.
+#---------------------------------------------------
+ivm64_link() {
+    verbose && >&2 echo   "ivm64-link ----------------------------------------"
+
+    if test $# -lt 1; then
+        verbose && >&2 echo "Usage:"
+        verbose && >&2 echo "   ${FUNCNAME[0]} [--noexec] file1.s file2.s file3.o -o output.s"
+        kill -USR1 $$
+    fi
+
+    FILES=
+    OUTPUT=
+    NOEXEC=
+    TRACE=
+    CRT0S=
+    ENTRY=
+
+    while test $# -gt 0
+    do
+        case $1 in
+            -o|--output)
+                shift
+                OUTPUT="$1"
+                ;;
+            --noexec)
+                NOEXEC=1
+                ;;
+            -t)
+                TRACE=1
+                ;;
+            -mcrt0)
+                CRT0S=1
+                ;;
+            -e)
+                shift
+                ENTRY="-e $1"
+                ;;
+            *)
+                if test -f "$1"
+                then
+                    FILES="${FILES} $1"
+                fi
+                ;;
+        esac
+        shift
+    done
+
+    if test -z "$FILES"
+    then
+        >&2 echo 'No files to link'
+        return
+    fi
+
+    test -z "$OUTPUT" && OUTPUT="$OUTFILEDEF"
+
+    verbose && >&2 echo "OUTPUT=$OUTPUT"
+    echo '# This is an ivm64 assembly container generated by ld'> "${OUTPUT}"
+    echo '#' >> "${OUTPUT}"
+
+    PREFETCHOBJID=1
+    if test $PREFETCHOBJID -eq 1; then
+        unset FILEOBJIDS
+        declare -A FILEOBJIDS
+        pfn='.'
+        while read l
+        do
+            fn=${l/::*/}; oid=${l/*::/};
+            FILEOBJIDS[${pfn}${fn}]=$oid
+        done < <(gawk '/^##:ivm64:obj-id:/{print FILENAME "::" $2} {nextfile}' $FILES )
+    fi
+
+    unset OBJIDS
+    declare -A OBJIDS
+
+    CATFILES=
+    nfiles=0
+    for i in $FILES
+    do
+        let nfiles=nfiles+1
+        skiplocallize=
+        filename="$i"
+        if test $PREFETCHOBJID -eq 1; then
+            objid=${FILEOBJIDS[${pfn}${i}]}
+        else
+            objid=`gawk '/^##:ivm64:obj-id:/{print $2} {exit}' "$i"`
+        fi
+
+        if ! test -z "$objid"  && test -z ${OBJIDS[$objid]} ; then
+            OBJIDS[$objid]="$filename"
+            skiplocallize=1
+        elif ! test -z "$objid" && cmp "${OBJIDS[$objid]}" "$filename" >& /dev/null; then
+            continue
+        elif ! magic_ivm64 "$i" ; then
+            >&2 echo "'$i' is not a valid ivm64 assembly file: missing magic line '#GCC Cross Compiler for ivm64'"
+            kill -USR1 $$
+        else
+            true
+        fi
+
+        if test -z "$skiplocallize" ; then
+            ! test -z "$CATFILES" && cat $CATFILES >> "$OUTPUT" && CATFILES=
+            suffix="_${nfiles}"
+            locallize "$i" "$suffix" >> "$OUTPUT"
+        else
+            CATFILES="$CATFILES $i"
+            continue
+        fi
+
+    done
+    ! test -z "$CATFILES" && cat $CATFILES >> "$OUTPUT"
+
+    verbose && >&2 echo "Processed $nfiles files"
+
+
+    if test -z "$NOEXEC" && ! has_extension "${OUTPUT}" '(S|o|so[\.0-9]*)'
+    then
+        verbose && >&2 echo "------ Adding shebang and crt0.S to make the assembly executable"
+        echo "${IVMSHEBANG/ivm as /ivm as $ENTRY }" > "$OUTPUTTMP"
+        echo "__IVM64_start_address__:" >> "$OUTPUTTMP"
+        if ! test -z "$CRT0S"; then
+            crt0file="$(dirname $0)/crt0.S"
+            if test -f "$crt0file" ; then
+                cat "$crt0file" >> "$OUTPUTTMP"
+            else
+                cat  >> "$OUTPUTTMP" << EOCRT0
+
+# This start up sequence has been introduced by ld
+    push! 0
+    push! 0
+    push! 0
+    push! 0
+    push! 0
+    push! 0
+    call! main
+    exit
+
+EOCRT0
+            fi
+        fi
+
+        # Add some credits
+        cat >> "$OUTPUT" << EOC
+
+        # Credits can be printed using .credits as an entry point when compiling:
+        #   ivm64-gcc -e .credits ...
+        #   ivm as -e .credits ...
+        .LIVM_credit_string:
+        data4 [0x64657243 0x3a737469 0x616c450a 0x206f6964 0x69747547 0x65727265]
+        data4 [0x53202c7a 0x69677265 0x6f52206f 0x6f72656d 0x734f202c 0x20726163]
+        data4 [0x74616c50 0x6e550a61 0x72657669 0x79746973 0x20666f20 0x616c614d]
+        data4 [0x320a6167 0x0a313230 0x0000000a]
+
+        EXPORT .credits
+        .credits:
+                push! .LIVM_credit_string
+        .LIVM_next:  load1! (load8 &0)
+                jump_zero!! (load1 &0) .LIVM_exit
+                put_char
+                add! 1
+                jump! .LIVM_next
+        .LIVM_exit:  exit
+EOC
+
+        verbose && >&2 echo "------ Cleaning up and labellizing with debugging purposes"
+        if test -z "$TRACE"
+        then
+            cat "$OUTPUT" \
+              | egrep -v '^(\s*IMPORT|##:ivm64:|\s*\.stab_)' \
+              | label_dedup >> "$OUTPUTTMP"
+        else
+            cat "$OUTPUT" \
+              | egrep -v '^(\s*IMPORT|##:ivm64:|\s*\.stab_)' \
+              | label_dedup \
+              | labellize   >> "$OUTPUTTMP"
+        fi
+
+        # Add the global variable __heap_start; it is used by crt0.c and sbrk.c
+        # in libgloss. It must point to the start of heap zone, which is achieved
+        # with the last 'space' invocation that appears in the code
+        IVM64_HEAP_START=__IVM64_heap_pointer__
+        echo "$IVM64_HEAP_START:" >> "$OUTPUTTMP"
+        echo -e "\tspace 1"       >> "$OUTPUTTMP"
+
+        mv "${OUTPUTTMP}" "$OUTPUT"
+        chmod +x "$OUTPUT"
+    fi
+}
+
+
+#---------------------------------------------------
+#  Utils
+#---------------------------------------------------
+magic_ivm64() {
+        grep -l -i -q "$IVM64MAGIC" -- "$1" > /dev/null
+} #Usage: magic_ivm64 filename
+
+has_extension() {
+    [[ "$1" =~ \.${2}$ ]]
+} #Usage: has_extension filename regexp, e.g. "has_extension file.o o", the extension w/o dot
+
+is_asm() {
+    has_extension "$1" '(s|S)'
+} #Usage: is_asm filename
+
+is_ar(){
+    has_extension "$1" 'a' && [[ `file --mime-type -b -L "$1" ` =~ x-archive ]]
+} #Usage: is_ar filename
+
+is_object() {
+    ! is_ar "$1" && magic_ivm64 "$1"
+} #Usage: is_object filename
+
+
+in_path_list(){
+    filename="$1"
+    if test "$filename" == `basename "$filename"`; then
+        if ! test -f "$filename"; then
+            for p in $2
+            do
+                if test -f "${p}/${filename}"; then
+                    filename="${p}/${filename}"
+                    break
+                fi
+            done
+        fi
+    fi
+    if  test -f "$filename"; then
+        echo $filename
+    else
+        echo ""
+    fi
+} #Usage: in_path_list $filename $PATHLIST
+
+# A simple named timer
+declare -A timer_ta timer_tb timer_T
+timer_start(){
+    timer_ta[$1]=`date +%s%N` # time in nanosec.
+} # Usage: timer_start timername
+
+timer_stop(){
+    timer_tb[$1]=`date +%s%N` # time in nanosec.
+    timer_T[$1]=$(( ${timer_T[$1]} + ${timer_tb[$1]}- ${timer_ta[$1]} ))
+} # Usage: timer_stop timername
+
+timer_print_secs(){ # print accumulated timer time in seconds
+    echo `bc -l <<< "scale=3; 0${timer_T[$1]}/10^9"`
+} # Usage: timer_print_secs timername
+
+#---------------------------------------------------
+# Labellization (for debugging, this avoid some optimizations
+# carried out by the emulator and allows locating
+# lines of code more easily)
+#---------------------------------------------------
+labellize() {
+    gawk '
+        {
+         a=$0;
+         gsub(/#.*$/, "", a) # Remove comment
+         gsub(/^[ \t\r\n]+/, "", a) # Trim
+         gsub(/[ \t\r\n]+$/, "", a) # Trim
+         nocode = (a~/data|[\[\]]/) || (a~/:$/) || (a~/EXPORT/) || (length(a)<1) # Not a code line
+         labelmode = labelmode || (a~/:$/)
+        }
+
+        (!nocode){ # Code line
+         suffix=a; # Suffix
+         gsub(/[^a-zA-Z0-9]+/, "_", suffix);
+         if (! labelmode){
+             print ".DD" NR "_" suffix ": \n\t" $0 "\n"; # Add label ".DD<NR>_<a>:" to the line
+         } else {
+             print $0
+             labelmode = 0
+         }
+        }
+
+        (nocode){ # Directive or existing label
+            print $0
+        }
+    '
+} # Usage: cat file.s | labellize  # labellize reads from stdin and write to stdout
+
+#---------------------------------------------------
+# Remove replicated global label declarations
+#---------------------------------------------------
+label_dedup() {
+    # Remove duplicate global labels and abbreviations
+    # in ivm assembly codes by renaming the declaration
+    # of second and subsequent occurencies
+    # Labels are defined ending with ':', whereas aliases
+    # (abbreviations) uses '='
+    #
+    # Note that references to the duplicate label are
+    # not replaced, so they go on to reference the first
+    # occurrency
+    #
+    # In this you can redefine a library function
+    # in a main program, which will have priority
+
+    gawk 'BEGIN{c=0; suffix = ".dup"; }
+          /[:=]/{match($0,/^\s*([A-Za-z_.][A-Za-z0-9_.]*)\s*[:=]/,a)
+             if (a[1]) {
+                 new = a[1]
+                 if (label[new]) {
+                    do {
+                        new = new suffix c++
+                    } while (label[new])
+                    sub(a[1], new)
+                 }
+                 label[new] = 1
+             }
+            }
+          {print $0}' "$@"
+}
+
+#---------------------------------------------------
+# DCE utils
+#---------------------------------------------------
+# Utility functions to find the objects, and only these objects,
+# on which a series of ivm64 assembly codes depends (DCE: dead
+# code elimination at assembly level)
+#
+# Usage: dce_do lib1.a [lib2.a lib3.a dir1 dir2 ...] -- file1.s [file2.s ...]
+#   dce_do.sh: the DCE function
+#   lib1.a lib2.a lib3.a ...: a list of libraries or directory with objects,
+#                             with all object files to be analyzed
+#   -- separates the list of  libraries from the list of files
+#   file1.s, file2.s ...: assembly files that may depend on the library objects
+
+#---------------------------------------------------
+# Get all global labels ("EXPORT label")
+# This print a list of pairs: "filename:::global1|global2|..."
+# one per line, being global1,... the globals in the file
+#---------------------------------------------------
+dce_get_globals() {
+    gawk 'BEGIN{}
+          match($0, /^\s*EXPORT\s+([a-zA-Z0-9_\.]*)/, b) {exported[FILENAME][b[1]]=1; files[FILENAME]=1;}
+          END {
+                for (f in files){
+                    exported_l = ""
+                    for (l in exported[f])
+                        exported_l = exported_l "|" l
+                    gsub(/^\|/, "", exported_l)
+                    gsub(/\./, "\\\\.", exported_l)
+                    printf("%s:::%s\n", f,  exported_l)
+                }
+          }' "$@"
+}
+
+#---------------------------------------------------
+# For each pair filename:::pattern,  print two lines:
+#    EXPORTPAT[filename]=(regexp for space or begin)(pattern)(regexp for space or end)
+#    EXPORTPAT_NSP[filename]=pattern
+# Intended to be applied to the output of dce_get_globals() and then to be evaluated
+# within the shell with 'eval' or 'source' commands
+#---------------------------------------------------
+dce_set_globals() {
+    gawk -F ':::' '{printf("filename=\"%s\"       \
+                    filepattern=\"%s\"    \
+                    EXPORTPAT[\"$filename\"]='"'"'(^| )('"'"'$filepattern'"'"')($| )'"'"' \
+                    EXPORTPAT_NSP[\"$filename\"]=$filepattern \
+                    \n", $1, $2)
+                    }'
+}
+
+#---------------------------------------------------
+# Get a list of a potential labels used by a file,
+# excluding .L* labels; this must create a space-separated
+# list of labels
+# We call it the signature of the file
+#---------------------------------------------------
+dce_signature() {
+    gawk '{sub(/#.*$/, ""); sub(/^\s*[a-zA-Z0-9_]+\s*$/, ""); sub(/^\s*EXPORT\s/, " "); print $0}' "$1" \
+         | tr " \t\r[]()=" "\n"                 \
+         | egrep '^[a-zA-Z_\.][a-zA-Z0-9_\.]*$' \
+         | egrep -v '^\.L|\/'                   \
+         | sort -u                              \
+         | tr "\n" " "
+} # Usage: dce_signature file.s
+
+
+#---------------------------------------------------
+#  Static library dead code elimination:
+#  Given some libraries determine the minimal set of
+#  objects files requires to link some assembly codes.
+#
+#  Get a list of libraries (file .a or directory with .o)
+#  and provide those objects which a list of assembly
+#  codes depend on
+#
+#  It uses a temporary directory, copies the objects there,
+#  and prints the minimal list of object files necessary to link
+#  the set of assembly files
+#
+#  Usage:
+#     # First export the temporary directory in environment
+#     # variable DCETEMPDIR
+#     dce_do lib1.a [lib2.a ...] [dir1 dir2 ...] -- file1.s file2.s ...
+#
+#---------------------------------------------------
+dce_do() {
+    local TEMPDIR="$DCETEMPDIR"
+    if ! test -d "$TEMPDIR"; then
+        >&2 echo "You must export the variable DCETEMPDIR with a temporary directory"
+        kill -USR1 $$
+        exit 1
+    fi
+
+    if test $# -lt 3 || ! [[ $* =~ ' -- ' ]] ; then
+        >&2 echo "Usage: `basename $0` lib1.a [lib2.a dir3 ...] -- file1.s [file2.s ...] "
+        >&2 echo "       use -- to separate libraries from assembly files"
+        >&2 echo "       the libraries can be files *.a or folders with objets"
+        kill -USR1 $$
+        exit 1
+    fi
+
+    while test $# -gt 0
+    do
+        if test "$1" == "--"; then
+            shift
+            break
+        fi
+        if ! test -e "$1"; then
+            >&2 echo "Library or folder '$1' not found"
+            kill -USR1 $$
+            exit 1
+        elif test -d "$1"; then
+            argdir=`readlink -f "$1"`
+            (cd "$TEMPDIR"; cp "${argdir}"/*.[osS] . >& /dev/null)
+        elif is_ar "$1"; then
+            lib=`readlink -f "$1"`
+            (cd "$TEMPDIR"; ar x "$lib" )
+        else
+            >&2 echo "Argument '$1' neither ar-file nor directory"
+            kill -USR1 $$
+            exit 1
+        fi
+        shift
+    done
+
+    LIBDIR="$TEMPDIR"
+    LIBFILES=$(find "${LIBDIR}" -name "*.o" -or -name "*.so" 2>/dev/null) # object files in libraries
+
+    # Keep only one instance of files with the same contents
+    # ignoring duplicates
+    LIBFILES=`md5sum $LIBFILES | gawk '!uniq[substr($0,1,32)]++{print $2}'`
+
+    # If there are no objects, do nothing
+    if test -z "$LIBFILES"
+    then
+        >&2 echo "No objects (.o, .so) found in libraries"
+        return
+    fi
+
+    verbose && >&2 echo "Processing objects in libraries ..."
+    unset EXPORTPAT
+    declare -A EXPORTPAT
+
+    unset EXPORTPAT_NSP
+    declare -A EXPORTPAT_NSP
+
+    source <( dce_get_globals $LIBFILES | dce_set_globals )
+
+    unset OBJGROUP
+    declare -A OBJGROUP
+    unset OBJGROUPPAT
+    declare -A OBJGROUPPAT
+    groupsz=7 # group size
+    cnt=0
+    cntg=0
+    for idx in ${!EXPORTPAT[@]}
+    do
+        cnt=$(( $cnt + 1 ))
+        cntg=$(( $cnt / $groupsz ))
+        OBJGROUP[$cntg]="${OBJGROUP[$cntg]} ${idx}"
+        OBJGROUPPAT[$cntg]="${OBJGROUPPAT[$cntg]}|${EXPORTPAT_NSP[$idx]}"
+    done
+
+    for g in ${!OBJGROUP[@]}
+    do
+        OBJGROUPPAT[$g]="(^| )(··${OBJGROUPPAT[$g]})( |$)"
+    done
+
+    unset SIGNATURE
+    declare -A SIGNATURE
+    unset HASSIGNATURE
+    declare -A HASSIGNATURE
+    unset DEPS
+    declare -A DEPS
+
+    CATFILE=$TEMPDIR/_cat_all_asm.$$.s
+    cat "$@" > $CATFILE   # concatenate all files
+    set -- "$CATFILE"
+
+    while test $# -gt 0
+    do
+        f="$1"
+        if ! test -f "$f"; then
+            >&2 echo "File '$f' not found"
+            kill -USR1 $$
+            exit 1
+        fi
+
+        sign=`dce_signature "$f"`
+        for group in ${!OBJGROUP[@]}
+        do
+            if [[ "$sign" =~ ${OBJGROUPPAT["$group"]} ]] ; then
+                NEWGROUP=
+                NEWPAT=··
+                for o in ${OBJGROUP[$group]} # files in this group
+                do
+                    pattern="${EXPORTPAT["$o"]}"
+                    if [[ "$sign" =~ $pattern ]] ; then
+                        DEPS["$o"]=1
+                        set -- "$@" "$o"
+                    else
+                        pattern_nsp="${EXPORTPAT_NSP["$o"]}"
+                        NEWGROUP="${NEWGROUP} $o"
+                        NEWPAT="${NEWPAT}|${pattern_nsp}"
+                    fi
+                done
+                OBJGROUP[$group]=$NEWGROUP
+                OBJGROUPPAT[$group]='(^| )'${NEWPAT}'( |$)'
+            fi
+        done
+
+        shift
+    done
+
+    rm -f "$CATFILE"
+
+    # Print to stdout the list of minimal set of objects
+    echo ${!DEPS[@]} |  tr " " $'\n' | sort
+}
+
+
+#---------------------------------------------------
+# Let's link
+#---------------------------------------------------
+
+# First of all check requirements
+check_requirements
+
+# Link
+main "$@"
+
