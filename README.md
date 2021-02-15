@@ -148,7 +148,7 @@ Cleaning
 
 Here you can find some figures comparing different optimization levels:
 - codes have been compiled and executed on a Intel Core i7-3770 @3.40GHz server 
-- compiler version **ivm64-2.0** based on **GCC 10.2.0** were used
+- compiler version **ivm64-2.0** based on **GCC 10.2.0** was used
 - binaries were generated with **ivm v0.37** (be aware that ISA changed in this version)
 - simulations were carried out with the **yet another (fast) IVM emulator v1.17**
 
@@ -332,10 +332,11 @@ The driver IVM64 GCC calls to the compiler itself, **cpp/cc1** (C preprocessor a
 - Third, the linker 'ld' combines one or several object files (inlcuding libraries) into a single executable file. With this purpose, all local labels of each object are renamed in case they are reused in different files.
 
 - The executable file is just a concatenation of:
-  - A shebang header, that enables its execution
-  - the *crt0.o* startup file, which is placed at the very beginning,
-  - all object files (which are really assembly files), and
-  - the standard C libraries.
+   - A shebang header, that enables its execution
+   - the *crt0.o* startup file, which is placed at the very beginning,
+   - all object files (which are really assembly files),
+   - the standard C libraries, and
+   - other libraries provided in the command line
 
 ## Extra linker feature: DCE <a name="dce">
 
@@ -397,8 +398,8 @@ Notice that the DCE feature can reduce the size of the output at the expense of 
 
 This project contains an wide set of sample C source files, located in:
 ```
-./tests/examples
-./tests/tcc
+./misc/tests/examples
+./misc/tests/tcc
 ```
 
 Before continuing examples in this section, follow the steps in [Quick start](#quick) to prepare the working environment.

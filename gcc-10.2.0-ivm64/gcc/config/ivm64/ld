@@ -199,10 +199,8 @@ read -d '' IVMSHEBANG << 'EOF'
 ##:ivm64: #     export IVM_INDIR=/tmp/in
 ##:ivm64: #     ./a.out 1 2 3
 ##:ivm64: # next lines are executed by /bin/sh
-##:ivm64: if ! which ivm > /dev/null 2>/dev/null; then echo "Can't execute: application 'ivm' not found in PATH" ; exit 254; fi
-##:ivm64: ivm | gawk 'BEGIN{MAJOR=0; MINOR=25} {match($0, /v([0-9]+)\.([0-9]+)/,  a); if ((a[1]<MAJOR) || (a[1]==MAJOR && a[2]<MINOR)) {print "ivm v" MAJOR "." MINOR " or greater required"; exit 254} }'
-##:ivm64: F="!FN!"; ivm as --bin "${F}.b" --sym "${F}.sym" "${F}" 3>&2 2>&1 1>&3 # Create binary file
-##:ivm64: (if which "${IVM_EMU}" > /dev/null; then echo "Simulating with IVM_EMU=$IVM_EMU"; else echo "IVM_EMU not set or simulator not found; using 'ivm run'"; fi) 3>&2 2>&1 1>&3
+##:ivm64: F="!FN!"; if [ -f "${F}.b" -a "${F}.b" -nt "${F}" ] ; then echo "Using existing ${F}.b binary"; else if ! which ivm > /dev/null 2>/dev/null; then echo "Application 'ivm' not found in PATH" ; exit 254; else ivm as  --bin "${F}.b" --sym "${F}.sym" "${F}" 3>&2 2>&1 1>&3; fi; fi
+##:ivm64: (if which "${IVM_EMU}" > /dev/null; then echo "Simulating with IVM_EMU=$IVM_EMU"; else echo "IVM_EMU not set or simulator not found; trying with 'ivm'"; if ! which ivm > /dev/null 2>/dev/null; then echo "Application 'ivm' not found in PATH" ; exit 254; else echo "Using 'ivm run'"; fi; fi) 3>&2 2>&1 1>&3
 ##:ivm64: trap 'rm -f !FN!_cmd_' EXIT HUP INT TERM QUIT; export F="!FN!"; if ! which "${IVM_EMU}" > /dev/null; then IVM_EMU="ivm run"; fi; ARG_FILE=/proc/$PPID/cmdline; ARG_FILE_OPT=; if test -f "$ARG_FILE"; then cut -d '' -f 3- $ARG_FILE | tr -d $'\\n' > !FN!_cmd_; ARG_FILE_OPT="-a !FN!_cmd_"; fi; OUT_DIR_OPT=; test -d "$IVM_OUTDIR" && OUT_DIR_OPT="-o $IVM_OUTDIR";  IN_DIR_OPT=; test -d "$IVM_INDIR" && IN_DIR_OPT="-i $IVM_INDIR"; (echo; ${IVM_EMU} ${OUT_DIR_OPT} ${IN_DIR_OPT} ${ARG_FILE_OPT} -m ${IVM_MAXMEM:-67108864} "${F}.b") 3>&2 2>&1 1>&3; S=$?; exit $S
 ##:ivm64: exit 0
 ##
