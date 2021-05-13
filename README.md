@@ -173,10 +173,10 @@ This table shows the results for the **static-unboxer** program for different op
 
 | Optimization<br>level | Executed<br>instructions | Binary size | space x time<br>factor<sup>$</sup> |
 |-----------------|----------------------|-------------|---------------|
-| -O3             | **15716 millions**   | 1473 KB     | 23 |
-| -Os             | 17251 millions       | **1283 KB** | **22** |
-| -O2 (default)   | 16275 millions       |1375 KB     | **22** |
-| -O0             | 45355 millions       | 1704 KB     | 77 |
+| -O3             | **14408 millions**   | 1466 KB     | 22 |
+| -Os             | 16036 millions       | **1279 KB** | 21 |
+| -O2 (default)   | 14968 millions       | 1369 KB     | **20** |
+| -O0             | 45171 millions       | 1700 KB     | 77 |
 
 <sup> $</sup><small>executed_instructions (millions) * size (KB)/1e6</small>
 
@@ -184,7 +184,7 @@ For this example, next table summarized the time required to assembly the result
 
 | Optimization<br>level | assembly time<br>(ivm as) | simulation time<br>(fast ivm_emu)|
 |--------------------|--------------------------|-------------|
-| -O2 (default)      | ~10s. | 40s. |
+| -O2 (default)      | ~10s. | 35s. |
 | -Os                | ~10s. | 45s. |
 
 
