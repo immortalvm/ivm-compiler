@@ -32,6 +32,8 @@ extern const char *ivm64_rtxcode2insn(int code);
 extern int ivm64_pass_in_progress(const char *name);
 extern int ivm64_postreload_in_progress();
 extern int ivm64_extra_peep2_in_progress(int extra);
+extern rtx ivm64_copy_rtx(rtx orig);
+
 
 /* Expand functions */
 
@@ -72,7 +74,7 @@ extern long ivm64_output_return_value(rtx *operands, int restore_slots);
 extern void ivm64_output_cbranch(rtx *operands, machine_mode mode);
 extern void ivm64_output_cbranch_peep(rtx *operands, machine_mode mode, int reverse, rtx_insn *insn);
 extern int  ivm64_peep_pop_cmp_p(rtx op, int reverse);
-extern void ivm64_output_casesi (rtx *operands);
+extern void ivm64_output_casesi(rtx *operands);
 extern void ivm64_output_setsp(FILE *file, long n);
 
 /* Public functions used in other files (ivm64.h, ivm64.md, ...)*/

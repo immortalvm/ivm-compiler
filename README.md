@@ -20,7 +20,7 @@
 
 This project presents the current released version of the IVM64 GCC compiler and toolchain (```as``` and ```ld```).
 
-The last version is **ivm64-2.0**, which is based on **GNU CC v10.2.0** (note that previous versions were based on gcc 8.3.0).
+The last version is **ivm64-2.1**, which is based on **GNU CC v10.2.0** (note that previous versions were based on gcc 8.3.0).
 
 The **main features** of the IVM64 GCC compiler are:
 
@@ -37,6 +37,8 @@ The **main features** of the IVM64 GCC compiler are:
 - Support for type ```__int128``` as integer of 128 bits (note that ```long long``` is still 64 bit wide)
 
 - Supported asm inlined in C
+
+- Support for nested functions, trampolines and nonlocal gotos
 
 - Complete C standard library (libc, libm) from newlib
 
@@ -148,7 +150,7 @@ Cleaning
 
 Here you can find some figures comparing different optimization levels:
 - codes have been compiled and executed on a Intel Core i7-3770 @3.40GHz server 
-- compiler version **ivm64-2.0** based on **GCC 10.2.0** was used
+- compiler version **ivm64-2.1** based on **GCC 10.2.0** was used
 - binaries were generated with **ivm v0.37** (be aware that ISA changed in this version)
 - simulations were carried out with the **yet another (fast) IVM emulator v1.17**
 
@@ -608,14 +610,14 @@ This command will compile each C source code with both the 'gcc' for the host an
 
 From the original set, those C codes requiring features not supported by the abstract machine (e.g. frame pointer register, file operations,...) are excluded from compiling. In the other hand, those tests whose output depend on the data alignment are not compared as they always differ from the host version, but they can run correctly if invoked by hand.
 
-## ABI <a name="abi"> (call convention)
+## ABI <a name="abi"> (calling convention)
 This section describes in short the Application Binary Interface (ABI) related to the calling convention used by ivm64-gcc. Assembly codes aspiring to interoperate with gcc-generated functions must satisfy these conventions.
 
-The call convention has changed from release 1.0rc4 to 1.0rc5.
+The calling convention has changed from release 1.0rc4 to 1.0rc5.
 
 _Note:_ This ABI can be subject to change due to future optimizations.
 
-A unique ABI is used for all functions regardless the number of arguments (no arguments/fixed number of arguments/variable number of arguments). This call convention is based on the "caller pops arguments" rule, so that the **caller** is in charge of releasing the arguments and move the return value to its destination:
+A unique ABI is used for all functions regardless the number of arguments (no arguments/fixed number of arguments/variable number of arguments). This calling convention is based on the "caller pops arguments" rule, so that the **caller** is in charge of releasing the arguments and move the return value to its destination:
 
   - Caller may allocate one stack slot for the return value
   - Caller passes all arguments on the stack

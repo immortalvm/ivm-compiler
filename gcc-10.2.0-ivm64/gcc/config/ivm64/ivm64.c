@@ -7,7 +7,7 @@
  *  Sergio Romero Montiel
  *  Oscar Plata Gonzalez
  *
- * Date: Oct 2019 - Feb 2021
+ * Date: Oct 2019 - May 2021
  *
  */
 
@@ -118,75 +118,84 @@ void ivm64_cpu_cpp_builtins(struct cpp_reader *pfile)
 int ivm64_peep_enabled(enum ivm64_peephole2 peep)
 {
     switch(peep) {
-        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP,          1);
-        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_PUSH_POP, 1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_MOVE,         1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_POP_PUSH, 1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_MOVE,          1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_MOVE2,         1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSHARG,       1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSHARG,      1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_BINOP,                 1);
-        IVM64_SET_PEEP(IVM64_PEEP2_BINOP1,                     1);
-        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_2_3,                1);
-        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_2,                  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_DEADREG_BINOP_2,    1);
-        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_2_DEADREG_BINOP_3,  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_ZERO_EXTEND,                1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP,                        1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_PUSH_POP,               1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_MOVE,                       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_POP_PUSH,               1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_MOVE,                        1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_MOVE2,                       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSHARG,                     1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSHARG,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_BINOP,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP2_BINOP1,                          1);
+        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_2_3,                     1);
+        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_2,                       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_DEADREG_BINOP_2,         1);
+        IVM64_SET_PEEP(IVM64_PEEP2_BINOP_1_2_DEADREG_BINOP_3,       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_ZERO_EXTEND,                     1);
         IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_DEADREG_BINOP,          1);
         IVM64_SET_PEEP(IVM64_PEEP2_UNARY_DEADREG_BINOP,             1);
         IVM64_SET_PEEP(IVM64_PEEP2_UNARY_1_BINOP_2_DEADREG_BINOP_3, 1);
         IVM64_SET_PEEP(IVM64_PEEP2_RDX_1_2,                         1);
-        IVM64_SET_PEEP(IVM64_PEEP2_SIGNX,                1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH_COMMUTATIVE,      1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH_IMM_COMMUTATIVE,  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_SUB,               1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH_SUB,              1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_COMMUTATIVE,       1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH,                  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POW2,                       1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOVE,                   1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH,               1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSHDI,             1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POPDI_PUSH,             1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_IND_PUSH,           1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_IND_OFFSET_PUSH,    1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_CBRANCH,            1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_CBRANCH_REV,        1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POPDI_CBRANCH,          1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POPDI_CBRANCH_REV,      1);
-        IVM64_SET_PEEP(IVM64_PEEP2_SET_CBRANCH,            1);
-        IVM64_SET_PEEP(IVM64_PEEP2_SET_CBRANCH_REV,        1);
-        IVM64_SET_PEEP(IVM64_PEEP2_SIGNX_POP_CBRANCH_REV,  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_SET_NOP,       1);
-        IVM64_SET_PEEP(IVM64_PEEP2_NOP_SET,       1);
-        IVM64_SET_PEEP(IVM64_PEEP2_POP_NOP_PUSH,  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOV_PUSH,      1);
-        IVM64_SET_PEEP(IVM64_PEEP2_MOV_PUSH_POP_PUSH_POP, 1);
-        IVM64_SET_PEEP(IVM64_PEEP2_CALL_PUSH_AR,        1);
-        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_BINOP,                    1);
-        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_PUSH_BINOP_MULTIMODE, 1);
-        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_INDPUSH_ZERO_EXTEND,      1);
-        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_SUB_NEG,                  1);
-        IVM64_SET_PEEP(IVM64_PEEP2_AND_POP,                       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_SIGNX,                           1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH_COMMUTATIVE,           1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH_IMM_COMMUTATIVE,       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_SUB,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH_SUB,                   1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_COMMUTATIVE,            1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE_PUSH,                       1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POW2,                            1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOVE,                            1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH,                        1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSHDI,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POPDI_PUSH,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_IND_PUSH,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_IND_OFFSET_PUSH,             1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_CBRANCH,                     1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_CBRANCH_REV,                 1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POPDI_CBRANCH,                   1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POPDI_CBRANCH_REV,               1);
+        IVM64_SET_PEEP(IVM64_PEEP2_SET_CBRANCH,                     1);
+        IVM64_SET_PEEP(IVM64_PEEP2_SET_CBRANCH_REV,                 1);
+        IVM64_SET_PEEP(IVM64_PEEP2_SIGNX_POP_CBRANCH_REV,           1);
+        IVM64_SET_PEEP(IVM64_PEEP2_SET_NOP,                         1);
+        IVM64_SET_PEEP(IVM64_PEEP2_NOP_SET,                         1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_NOP_PUSH,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOV_PUSH,                        1);
+        IVM64_SET_PEEP(IVM64_PEEP2_MOV_PUSH_POP_PUSH_POP,           1);
+        IVM64_SET_PEEP(IVM64_PEEP2_CALL_PUSH_AR,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_BINOP,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_PUSH_BINOP_MULTIMODE,   1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_INDPUSH_ZERO_EXTEND,        1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_SUB_NEG,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_AND_POP,                         1);
         IVM64_SET_PEEP(IVM64_PEEP2_PUSH_ADD_POP_PUSH_IND_POP,       1);
         IVM64_SET_PEEP(IVM64_PEEP2_PUSH_ADD_POP_PUSH_IND_OFFSET_POP,1);
         IVM64_SET_PEEP(IVM64_PEEP2_MOVE_MOVE_MOVE,                  1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_BINOP_COMMUTATIVE,      1);
+        IVM64_SET_PEEP(IVM64_PEEP2_POP_PUSH_BINOP_SUB,              1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_CASESI,                 1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_SIGNX_POP_CASESI,           1);
+        IVM64_SET_PEEP(IVM64_PEEP2_SIGNX_SIGNX,                     1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_SIGNX,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_PUSH_SIGNX,             1);
+        IVM64_SET_PEEP(IVM64_PEEP2_INDPUSH_POP_PUSH_SIGNX,          1);
         // assembly peepholes
-        IVM64_SET_PEEP(IVM64_PEEP1_MOVE_PUSH_POP,          1);
-        IVM64_SET_PEEP(IVM64_PEEP1_SHIFTRU63_AND,          1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSHAR_BINOP_POPAR,     1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_COMMUTATIVE_POPAR, 1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_SUB_POPAR,         1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_BINOP_BINOP_POPAR, 1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_ADD,               1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSHAR_UNARY_POPAR,     1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSHAR_SIGNX_POPAR,     1);
-        IVM64_SET_PEEP(IVM64_PEEP1_POP_PUSH,               1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_SIGNX,             1);
-        IVM64_SET_PEEP(IVM64_PEEP1_IND_PUSH_SIGNX,         1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_POPAR,             1);
-        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_POPMEMAR,          1);
+        IVM64_SET_PEEP(IVM64_PEEP1_MOVE_PUSH_POP,                   1);
+        IVM64_SET_PEEP(IVM64_PEEP1_SHIFTRU63_AND,                   1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSHAR_BINOP_POPAR,              1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_COMMUTATIVE_POPAR,          1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_SUB_POPAR,                  1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_BINOP_BINOP_POPAR,          1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_BINOP_POPAR,                1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_ADD,                        1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSHAR_UNARY_POPAR,              1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSHAR_SIGNX_POPAR,              1);
+        IVM64_SET_PEEP(IVM64_PEEP1_POP_PUSH,                        1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_SIGNX,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP1_IND_PUSH_SIGNX,                  1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_POPAR,                      1);
+        IVM64_SET_PEEP(IVM64_PEEP1_PUSH_POPMEMAR,                   1);
     }
     return 0;
 }
@@ -358,6 +367,17 @@ rtx const_reg_equiv(rtx insn){
         }
     }
     return NULL_RTX;
+}
+
+/* Function copy_rtx() does not duplicate REGs as they are
+   considered shareable (see emit-rtl.c:copy_rtx())
+   This helper function solves this */
+rtx ivm64_copy_rtx(rtx orig){
+  if (REG_P(orig)) {
+    return gen_rtx_REG(GET_MODE(orig), REGNO(orig));
+  } else {
+    return copy_rtx(orig);
+  }
 }
 
 
@@ -1336,7 +1356,6 @@ void ivm64_output_cbranch(rtx *operands, machine_mode mode)
     operands[1] = ivm64_const_int_zero_extend(operands[1], modesize);
     operands[2] = ivm64_const_int_zero_extend(operands[2], modesize);
 
-
     rtx operand0, operand1;
     if (swapping) {
         operand0 = operands[2];
@@ -1350,7 +1369,6 @@ void ivm64_output_cbranch(rtx *operands, machine_mode mode)
         && (rtx_equal_p (operands[1], const0_rtx)
             || rtx_equal_p (operands[2], const0_rtx))
     ) {
-
         /* Stack adjust not necessary as this push is swallowed by the
            jump; no comparison emitted when comparing with 0 */
         if (rtx_equal_p (operands[1], const0_rtx))
@@ -1365,6 +1383,13 @@ void ivm64_output_cbranch(rtx *operands, machine_mode mode)
         }
         return;
     }  else if (EQ == code) {
+        if (REG_P(operand1) && (REGNO(operand1) == AR_REGNUM)){
+            rtx r;
+            r = operand0;
+            operand0 = operand1;
+            operand1 = r;
+        }
+
         ivm64_output_push(operand0, GET_MODE(operand0));
         ivm64_stack_extra_offset += UNITS_PER_WORD;
 
@@ -1375,9 +1400,25 @@ void ivm64_output_cbranch(rtx *operands, machine_mode mode)
 
         output_asm_insn("jump_zero! %3", operands);
         return;
+    } else if ( ((LT == code) || (GE == code))
+        && rtx_equal_p(operands[2], const0_rtx))
+    {
+        rtx shift = GEN_INT(1UL << (8*GET_MODE_SIZE(mode) - 1));
+
+        int do_mul1 = (LE == code) || (GT == code);
+        int do_ltu = (LT == code) || (GT == code);
+
+        ivm64_output_push(operands[1], mode);
+        if (do_mul1) {
+            output_asm_insn("mult! -1", NULL);
+        }
+        output_asm_insn("and! %h0", &shift);
+        if (do_ltu) {
+            output_asm_insn("lt_u! 1", NULL);
+        }
+        output_asm_insn("jump_zero! %3", operands);
+        return;
     } else if ( ((GT == code) || (GE == code)) && CONST_INT_P(operands[2])) {
-
-
         rtx const2_N1 = GEN_INT((1UL) << (8*modesize-1));
 
         ivm64_output_push(operands[1], mode);
@@ -1398,25 +1439,6 @@ void ivm64_output_cbranch(rtx *operands, machine_mode mode)
 
         return;
 
-    } else if ( ((LT == code) || (GE == code))
-        && rtx_equal_p(operands[2], const0_rtx))
-    {
-
-        rtx shift = GEN_INT(1UL << (8*GET_MODE_SIZE(mode) - 1));
-
-        int do_mul1 = (LE == code) || (GT == code);
-        int do_ltu = (LT == code) || (GT == code);
-
-        ivm64_output_push(operands[1], mode);
-        if (do_mul1) {
-            output_asm_insn("mult! -1", NULL);
-        }
-        output_asm_insn("and! %h0", &shift);
-        if (do_ltu) {
-            output_asm_insn("lt_u! 1", NULL);
-        }
-        output_asm_insn("jump_zero! %3", operands);
-        return;
     } else {
         rtx const2_N1 = GEN_INT((1UL) << (8*modesize-1));
 
@@ -1432,6 +1454,13 @@ void ivm64_output_cbranch(rtx *operands, machine_mode mode)
             ivm64_stack_extra_offset += UNITS_PER_WORD;
             ivm64_output_push(operand1, GET_MODE(operand1));
         } else {    // eq/ne
+            if (REG_P(operand1) && (REGNO(operand1) == AR_REGNUM)){
+                rtx r;
+                r = operand0;
+                operand0 = operand1;
+                operand1 = r;
+            }
+
             ivm64_output_push(operand0, GET_MODE(operand0));
             ivm64_stack_extra_offset += UNITS_PER_WORD;
             ivm64_output_push(operand1, GET_MODE(operand1));
@@ -1472,7 +1501,6 @@ static int ivm64_rtx_is_and_const(rtx x, unsigned long *val) {
     return ret ;
 }
 
-
 static int ivm64_rtx_is_unspec_push(rtx x, machine_mode *mode) {
     int ret = 0;
     if (GET_CODE(x) == SET){
@@ -1491,7 +1519,6 @@ static int ivm64_rtx_is_unspec_push(rtx x, machine_mode *mode) {
     }
     return ret;
 }
-
 
 /* Print a compare and branch action for one operand in the best possible way
    to reduce the number of native ivm64 instructions; the first operand
@@ -1526,7 +1553,7 @@ void ivm64_output_cbranch_peep(rtx *operands, machine_mode mode, int reverse, rt
     if (modesize == 1) {mask0extend = 0x0ff;}
 
     rtx prevrtx = PATTERN(PREV_INSN(insn));
-    unsigned long andval;
+    unsigned long andval = 0;
     int previsand = ivm64_rtx_is_and_const(prevrtx, &andval);
     machine_mode pushmode;
     int pushmodesize = 0;
@@ -1538,8 +1565,6 @@ void ivm64_output_cbranch_peep(rtx *operands, machine_mode mode, int reverse, rt
     operand1 = ivm64_const_int_zero_extend(operand1, modesize);
 
     int op1zero = rtx_equal_p(operand1, const0_rtx);
-
-
     /* Let's zero extend the operand already in the stack
        (i.e., this one supressed by the peephole) */
     rtx const0extend = GEN_INT(mask0extend);
@@ -1552,7 +1577,6 @@ void ivm64_output_cbranch_peep(rtx *operands, machine_mode mode, int reverse, rt
     }
 
     if (((NE == code) || (EQ == code)) && (op1zero)) {
-
         /* Stack adjust not necessary as this push is swallowed by the
            jump; no comparison emitted when comparing with 0 */
         negated = (EQ == code);
@@ -1625,42 +1649,46 @@ int ivm64_peep_pop_cmp_p(rtx op, int reverse) {
     operand 4: out-of-range label */
 void ivm64_output_casesi(rtx *operands)
 {
-    uint64_t min_idx_int = -INTVAL(operands[1]);
-    rtx min_idx_rtx = GEN_INT(min_idx_int);
+    machine_mode mode = GET_MODE(operands[0]);
+    int modesize = GET_MODE_SIZE(mode); /*bytes*/
+    int modebits = modesize * 8; /*bits*/
 
-    /* (unsigned)(index - lower_bound) > range */
-    uint64_t valop2 = INTVAL(operands[2]);
-    rtx valop2_rtx = GEN_INT(valop2 + 1);
+    uint64_t x0 = (1UL << modebits) - 1;
 
-    ivm64_output_push(operands[0], SImode);
-    ivm64_stack_extra_offset += UNITS_PER_WORD;
-    // sign extend
-    fprintf(asm_out_file, "\txor! %ld\n", 0x080000000UL);
-    fprintf(asm_out_file, "\tadd! %ld\n", 0xffffffff80000000);
+    uint64_t range_val = INTVAL(operands[2]) + 1UL;
+    rtx range = GEN_INT(range_val);
+    uint64_t lowerbound_val = -1UL * INTVAL(operands[1]);
+    rtx lowerbound = GEN_INT(lowerbound_val);
+    if (modesize == 8 || range_val <= x0){
+        operands[0] = ivm64_const_int_zero_extend(operands[0], modesize);
+        ivm64_output_push(operands[0], mode);
+        ivm64_stack_extra_offset += UNITS_PER_WORD;
 
-    if (min_idx_int != 0) {
-        output_asm_insn("add! %0", &min_idx_rtx);
+        if (lowerbound_val != 0) {
+            output_asm_insn("add! %0", &lowerbound);
+            fprintf(asm_out_file, "\tand! %ld\n", x0);
+        }
+
+        /* (unsigned)(index - lower_bound) > range */
+        output_asm_insn("lt_u! %0", &range);
+
+        /* jump to the out-of-range label*/
+        output_asm_insn("jump_zero! %4", operands);
+        ivm64_stack_extra_offset -= UNITS_PER_WORD;
     }
-    output_asm_insn("lt_u! %0", &valop2_rtx);
-
-
-    /* jump to the out-of-range label*/
-    output_asm_insn("jump_zero! %4", operands);
-    ivm64_stack_extra_offset -= UNITS_PER_WORD;
-
-    rtx word_size = GEN_INT(UNITS_PER_WORD);
 
     /* compute (index - lower bound)*sizeof(long)
        to index the dispatch table*/
-    ivm64_output_push(operands[0], SImode);
-    ivm64_stack_extra_offset += UNITS_PER_WORD;
-    // sign extend
-    fprintf(asm_out_file, "\txor! %ld\n", 0x080000000UL);
-    fprintf(asm_out_file, "\tadd! %ld\n", 0xffffffff80000000);
+    rtx word_size = GEN_INT(UNITS_PER_WORD);
 
-    if (min_idx_int != 0) {
-        output_asm_insn("add! %0", &min_idx_rtx);
+    ivm64_output_push(operands[0], mode);
+    ivm64_stack_extra_offset += UNITS_PER_WORD;
+
+    if (lowerbound_val != 0) {
+        output_asm_insn("add! %0", &lowerbound);
+        fprintf(asm_out_file, "\tand! %ld\n", x0);
     }
+
     output_asm_insn("mult! %0", &word_size);
     output_asm_insn("add! %0", &operands[3]);
     /* load the selected dispatch table entry */
@@ -2156,7 +2184,7 @@ static int ivm64_op_cost(int code)
         case NE:        return ivm64_op_cost(LTU) + ivm64_op_cost(XOR) +
                                 IVM64_COSTS_N_INSNS(1) + ivm64_op_cost(NOT);
         case SIGN_EXTEND:
-                        return IVM64_COSTS_N_INSNS(5);
+                        return IVM64_COSTS_N_INSNS(6);
         case ZERO_EXTEND:
                         return IVM64_COSTS_N_INSNS(0);
         default:
@@ -2610,6 +2638,57 @@ rtx ivm64_return_addr(int count, rtx frame ATTRIBUTE_UNUSED)
 #endif
 
 #define TARGET_FUNCTION_OK_FOR_SIBCALL hook_bool_tree_tree_false
+
+
+static rtx ivm64_static_chain(const_tree fndecl_or_type ATTRIBUTE_UNUSED,
+                              bool incoming_p ATTRIBUTE_UNUSED)
+{
+  return gen_rtx_MEM(DImode, gen_rtx_SYMBOL_REF (Pmode, ".XSC"));
+}
+
+/* Generate assembler code for constant parts of a trampoline. */
+static void ivm64_asm_trampoline_template(FILE *f)
+{
+    fprintf(f, "\tpush! 80000000000\n");   // Jump address
+    fprintf(f, "\tpush! 80000000000\n");   // Static chain value
+    fprintf(f, "\tpush! 80000000000\n");   // Static chain register (.XSC)
+    fprintf(f, "\tstore8 \n");
+    fprintf(f, "\tjump\n");
+    fprintf(f, "\tdata1 [0]*3\n");
+    fprintf(f, "\n\n");
+}
+
+
+/* Emit RTL insns to initialize the variable parts of a trampoline. */
+static void ivm64_trampoline_init(rtx m_tramp, tree fndecl, rtx chain_value)
+{
+  rtx fnaddr = XEXP(DECL_RTL(fndecl), 0);
+
+  // Copy the trampoline
+  emit_block_move (m_tramp, assemble_trampoline_template(),
+          		   GEN_INT(TRAMPOLINE_SIZE), BLOCK_OP_NORMAL);
+
+  rtx mem1 = adjust_address(m_tramp, DImode, 1);
+  ivm64_expand_push(fnaddr, DImode);
+  ivm64_expand_pop(mem1, DImode);
+
+  rtx mem2 = adjust_address(m_tramp, DImode, 10);
+  ivm64_expand_push(chain_value, DImode);
+  ivm64_expand_pop(mem2, DImode);
+
+  rtx screg = gen_rtx_SYMBOL_REF(DImode, ".XSC");
+  rtx mem3 = adjust_address(m_tramp, DImode, 19);
+  ivm64_expand_push(screg, DImode);
+  ivm64_expand_pop(mem3, DImode);
+}
+
+#undef TARGET_STATIC_CHAIN
+#define TARGET_STATIC_CHAIN ivm64_static_chain
+#undef TARGET_ASM_TRAMPOLINE_TEMPLATE
+#define TARGET_ASM_TRAMPOLINE_TEMPLATE ivm64_asm_trampoline_template
+#undef TARGET_TRAMPOLINE_INIT
+#define TARGET_TRAMPOLINE_INIT ivm64_trampoline_init
+
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 

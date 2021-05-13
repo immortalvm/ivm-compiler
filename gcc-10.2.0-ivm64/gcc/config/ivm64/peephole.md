@@ -6,7 +6,7 @@
 ;;  Sergio Romero Montiel
 ;;  Oscar Plata Gonzalez
 ;;
-;; Date: Apr-Jul 2019 - Dec 2020
+;; Date: Apr-Jul 2019 - May 2021
 
 ;; -------------------------------------------------------------------------
 ;; Peepholes
@@ -19,6 +19,8 @@
 ;; The peephole2 pass is run after register allocation but before scheduling,
 ;; which may result in much  better code for targets that do scheduling.
 
+(define_mode_iterator QIHISI1 [QI HI SI])
+(define_mode_iterator QIHISI2 [QI HI SI])
 (define_mode_iterator QIHISIDI1 [QI HI SI DI])
 (define_mode_iterator QIHISIDI2 [QI HI SI DI])
 (define_mode_iterator ALLMODES1 [DI SI HI QI SF DF])
@@ -742,9 +744,9 @@
 ;; -----------------------------------------------
 ;; TR <- p0 (QI, ...)
 ;; TR <- zero_extend(TR) (QI, ...)
-;; p1 <- TR (DI)
+;; (p1 <- TR (DI))
 ;;           =>  TR(SI...) <- p0 (QI, ...)
-;;               p1 <- TR (DI)
+;;               (p1 <- TR (DI))
 ;; -----------------------------------------------
 (define_peephole2
   [
@@ -759,10 +761,6 @@
          (zero_extend:DI (reg:QIHISI TR_REGNUM))
     )
     ;--
-    (set (match_operand:DI 1 "general_dst_operand")
-         (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
-    )
-    ;;---
   ]
   "(ivm64_peep_enabled(IVM64_PEEP2_ZERO_EXTEND))"
   [
@@ -772,11 +770,7 @@
                             (match_dup:QIHISI 0)]
            UNSPEC_PUSH_TR)
     )
-    ;--
-    (set (match_dup:DI 1)
-         (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
-    )
-    ;;---
+    ;;--
   ]
   {
   }
@@ -1350,7 +1344,7 @@
   ;;--
   ]
   {
-     operands[3] = copy_rtx(operands[1]);
+     operands[3] = ivm64_copy_rtx(operands[1]);
   }
 )
 
@@ -1902,6 +1896,8 @@
     ;;---
   ]
   "ivm64_peep_enabled(IVM64_PEEP2_SET_NOP)
+   && ! reg_mentioned_p(pc_rtx, operands[0])
+   && ! reg_mentioned_p(pc_rtx, operands[1])
    && (GET_CODE(operands[1]) != CALL)
   "
   [
@@ -1926,6 +1922,8 @@
     ;;---
   ]
   "ivm64_peep_enabled(IVM64_PEEP2_NOP_SET)
+   && ! reg_mentioned_p(pc_rtx, operands[0])
+   && ! reg_mentioned_p(pc_rtx, operands[1])
    && (GET_CODE(operands[1]) != CALL)
   "
   [
@@ -2560,6 +2558,415 @@
   }
 )
 
+;; -----------------------------------------------
+;; r0 <- TR
+;; TR <- r1 (r1 not depending on r0)
+;; TR <- TR binop3 s2 (s2 not depending on r0 )
+;; TR <- TR commutative binop4 r0 (r0 dead) (this action involves TR <- r0)
+;;       => TR <- r1
+;;          TR <- TR binop3 s2
+;;          TR <- TR binop4 TR
+;;
+;; -----------------------------------------------
+(define_peephole2
+  [
+    (set (match_operand:DI 0 "gp_register_operand" "")
+         (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (reg:QIHISIDI TR_REGNUM)
+              (unspec_volatile:QIHISIDI [(reg:QIHISIDI TR_REGNUM)
+                                (match_operand:QIHISIDI 1 "general_operand" "")]
+               UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:QIHISIDI2 TR_REGNUM)
+         (match_operator:QIHISIDI2 3 "binary_operator" [(reg:QIHISIDI2 TR_REGNUM)
+                  (match_operand:QIHISIDI2 2 "arithmetic_operand" "")])
+    )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_operator:DI 4 "aggregation_operator" [(reg:DI TR_REGNUM)
+                  (match_dup:DI 0)])
+    )
+    ;;---
+  ]
+  "( ivm64_peep_enabled(IVM64_PEEP2_POP_PUSH_BINOP_COMMUTATIVE)
+     && peep2_reg_dead_p(4, operands[0])
+     && !(REG_P(operands[1]) && REGNO(operands[1]) == STACK_POINTER_REGNUM)
+     && ! reg_mentioned_p(operands[0], operands[1])
+     && ! reg_mentioned_p(operands[0], operands[2])
+   )"
+  [
+    ;;---
+    (set (reg:QIHISIDI TR_REGNUM)
+              (unspec_volatile:QIHISIDI [(reg:QIHISIDI TR_REGNUM)
+                                (match_dup:QIHISIDI 1)]
+               UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:QIHISIDI2 TR_REGNUM)
+         (match_op_dup:QIHISIDI2 3 [(reg:QIHISIDI2 TR_REGNUM)
+                  (match_dup:QIHISIDI2 2 )])
+    )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_op_dup:DI 4
+                [(unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
+                 (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)])
+    )
+    ;;---
+  ]
+  {
+  }
+)
+
+;; -----------------------------------------------
+;; r0 <- TR
+;; TR <- r1 (r1 not depending on r0)
+;; TR <- TR binop3 s2 (s2 not depending on r0 )
+;; TR <- TR - r0 (r0 dead, this involves TR <- r0)
+;;       => TR <- r1
+;;          TR <- TR binop3 s2
+;;          TR <- TR - TR
+;;          TR <- -TR (neg)
+;;
+;; -----------------------------------------------
+(define_peephole2
+  [
+    (set (match_operand:DI 0 "gp_register_operand" "")
+         (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (reg:QIHISIDI TR_REGNUM)
+              (unspec_volatile:QIHISIDI [(reg:QIHISIDI TR_REGNUM)
+                                (match_operand:QIHISIDI 1 "general_operand" "")]
+               UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_operator:DI 3 "binary_operator" [(reg:DI TR_REGNUM)
+                  (match_operand:DI 2 "arithmetic_operand" "")])
+    )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_operator:DI 4 "binary_operator" [(reg:DI TR_REGNUM)
+                  (match_dup:DI 0)])
+    )
+    ;;---
+  ]
+  "( ivm64_peep_enabled(IVM64_PEEP2_POP_PUSH_BINOP_SUB)
+     && peep2_reg_dead_p(4, operands[0])
+     && (GET_CODE(operands[4]) == MINUS)
+     && !(REG_P(operands[1]) && REGNO(operands[1]) == STACK_POINTER_REGNUM)
+     && ! reg_mentioned_p(operands[0], operands[1])
+     && ! reg_mentioned_p(operands[0], operands[2])
+   )"
+  [
+    ;;---
+    (set (reg:QIHISIDI TR_REGNUM)
+              (unspec_volatile:QIHISIDI [(reg:QIHISIDI TR_REGNUM)
+                                (match_dup:QIHISIDI 1)]
+               UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_op_dup:DI 3 [(reg:DI TR_REGNUM)
+                  (match_dup:DI 2 )])
+    )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_op_dup:DI 4
+                [(unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
+                 (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)])
+    )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (neg:DI (reg:DI TR_REGNUM))
+    )
+    ;;---
+  ]
+  {
+  }
+)
+
+;; CASESI multimode -> REQUIRE MODIFYING .MD and output_casesi(() function
+(define_peephole2
+  [
+    ;;---
+    (set (reg:QIHISI TR_REGNUM)
+         (unspec_volatile:QIHISI [(reg:QIHISI TR_REGNUM)
+                                  (match_operand:QIHISI 0 "pushable_operand" "")]
+             UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (match_operand:DI 1 "gp_register_operand" "")
+         (unspec_volatile:DI [ (reg:DI TR_REGNUM) ] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (pc)
+        (if_then_else
+          (leu (minus:DI
+                    (match_operand 2 "gp_register_operand" "")
+                    (match_operand 3 "" ""))
+              (match_operand 4 "" ""))
+          (mem:DI (plus:DI (label_ref (match_operand 5 "" ""))
+                           (mult:DI (minus:DI (match_dup 2)
+                                              (match_dup 3))
+                                    (const_int 8))))
+          (label_ref:DI (match_operand 6 "" ""))))
+    ;;---
+  ]
+  "( ivm64_peep_enabled(IVM64_PEEP2_PUSH_POP_CASESI)
+     && (REGNO(operands[1]) == REGNO(operands[2]))
+     && peep2_reg_dead_p(3, operands[2]) )
+  "
+  [
+    ;;---
+    (unspec_volatile [(const_int 0)] UNSPEC_BLOCKAGE) ;; nop
+    ;;---
+    (set (pc)
+        (if_then_else
+          (leu (minus:DI
+                    (match_dup 2)
+                    (match_dup 3))
+              (match_dup 4))
+          (mem:DI (plus:DI (label_ref (match_dup 5))
+                           (mult:DI (minus:DI (match_dup 2)
+                                              (match_dup 3))
+                                    (const_int 8))))
+          (label_ref:DI (match_dup 6))))
+  ]
+  {
+   operands[2] = ivm64_copy_rtx(operands[0]);
+  }
+)
+(define_peephole2
+  [
+    ;;---
+    (set (reg:QIHISI TR_REGNUM)
+         (unspec_volatile:QIHISI [(reg:QIHISI TR_REGNUM)
+                                  (match_operand:QIHISI 0 "pushable_operand" "")]
+             UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand:QIHISI 1 "register_operand" ""))
+    )
+    ;;---
+    (set (match_operand:DI 2 "gp_register_operand" "")
+         (unspec_volatile:DI [ (reg:DI TR_REGNUM) ] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (pc)
+        (if_then_else
+          (leu (minus:DI
+                    (match_operand 3 "gp_register_operand" "")
+                    (match_operand 4 "" ""))
+              (match_operand 5 "" ""))
+          (mem:DI (plus:DI (label_ref (match_operand 6 "" ""))
+                           (mult:DI (minus:DI (match_dup 3)
+                                              (match_dup 4))
+                                    (const_int 8))))
+          (label_ref:DI (match_operand 7 "" ""))))
+    ;;---
+  ]
+  "( ivm64_peep_enabled(IVM64_PEEP2_PUSH_SIGNX_POP_CASESI)
+     && (REGNO(operands[1]) == TR_REGNUM)
+     && (REGNO(operands[2]) == REGNO(operands[3]))
+     && peep2_reg_dead_p(4, operands[3]) )
+  "
+  [
+    ;;---
+    (unspec_volatile [(const_int 0)] UNSPEC_BLOCKAGE) ;; nop
+    ;;---
+    (set (pc)
+        (if_then_else
+          (leu (minus:DI
+                    (match_dup 3)
+                    (match_dup 4))
+              (match_dup 5))
+          (mem:DI (plus:DI (label_ref (match_dup 6))
+                           (mult:DI (minus:DI (match_dup 3)
+                                              (match_dup 4))
+                                    (const_int 8))))
+          (label_ref:DI (match_dup 7))))
+  ]
+  {
+   operands[3] = ivm64_copy_rtx(operands[0]);
+  }
+)
+
+(define_peephole2
+  [
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand:QIHISIDI1 0 "register_operand" ""))
+    )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand:QIHISIDI2 1 "register_operand" ""))
+    )
+    ;;---
+  ]
+  "( ivm64_peep_enabled(IVM64_PEEP2_SIGNX_SIGNX)
+   && REGNO(operands[0]) == TR_REGNUM
+   && REGNO(operands[1]) == TR_REGNUM )
+   "
+  [
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand 2 "register_operand" ""))
+    )
+    ;;---
+  ]
+  {
+   enum machine_mode mode = (GET_MODE_SIZE(GET_MODE(operands[0])) < GET_MODE_SIZE(GET_MODE(operands[1])))
+                               ?GET_MODE(operands[0]):GET_MODE(operands[1]) ;
+   operands[2] = gen_rtx_REG(mode, TR_REGNUM);
+  }
+)
+
+(define_peephole2
+  [
+    ;;---
+    (set (reg:QIHISI TR_REGNUM)
+         (unspec_volatile:QIHISI [(reg:QIHISI TR_REGNUM)
+                                  (match_operand:QIHISI 0 "general_operand" "")]
+             UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand 1 "register_operand" ""))
+    )
+    ;;---
+  ]
+  "(ivm64_peep_enabled(IVM64_PEEP2_PUSH_SIGNX)
+   && (REGNO(operands[1]) == TR_REGNUM)
+   && (GET_MODE_SIZE(GET_MODE(operands[1])) > GET_MODE_SIZE(GET_MODE(operands[0]))))
+
+  "
+  [
+    ;;---
+    (set (reg:QIHISI TR_REGNUM)
+         (unspec_volatile:QIHISI [(reg:QIHISI TR_REGNUM)
+                            (match_dup:QIHISI 0)]
+             UNSPEC_PUSH_TR)
+    )
+  ]
+  {
+  }
+)
+
+(define_peephole2
+  [
+    ;;---
+    (set (reg:QIHISI1 TR_REGNUM)
+         (unspec_volatile:QIHISI1 [(reg:QIHISI1 TR_REGNUM)
+                                  (match_operand:QIHISI1 0 "general_operand" "")]
+             UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (match_operand:DI 1 "gp_register_operand" "")
+         (unspec_volatile:DI [ (reg:DI TR_REGNUM) ] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (reg:QIHISI2 TR_REGNUM)
+         (unspec_volatile:QIHISI2 [(reg:QIHISI2 TR_REGNUM)
+                                   (match_operand:QIHISI2 2 "gp_register_operand" "")]
+             UNSPEC_PUSH_TR)
+    )
+    ;;---
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand:QIHISI2 3 "register_operand" ""))
+    )
+    ;;---
+  ]
+  "(ivm64_peep_enabled(IVM64_PEEP2_PUSH_POP_PUSH_SIGNX)
+   && (REGNO(operands[1]) == REGNO(operands[2]))
+   && (REGNO(operands[3]) == TR_REGNUM)
+   && (GET_MODE_SIZE(GET_MODE(operands[3]))
+       > GET_MODE_SIZE(GET_MODE(operands[0]))))
+  "
+  [
+    ;;---
+    (set (reg:QIHISI1 TR_REGNUM)
+         (unspec_volatile:QIHISI1 [(reg:QIHISI1 TR_REGNUM)
+                                   (match_dup:QIHISI1 0)]
+             UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (match_dup:DI 1)
+         (unspec_volatile:DI [ (reg:DI TR_REGNUM) ] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (reg:QIHISI2 TR_REGNUM)
+         (unspec_volatile:QIHISI2 [(reg:QIHISI2 TR_REGNUM)
+                                   (match_dup:QIHISI2 2)]
+             UNSPEC_PUSH_TR)
+    )
+    ;;---
+  ]
+  {
+  }
+)
+
+(define_peephole2
+  [
+    ;;---
+    (set (reg:QIHISI1 TR_REGNUM)
+         (unspec_volatile:QIHISI1 [(mem:QIHISI1
+                                     (match_operand:DI 0 "register_operand" ""))]
+             UNSPEC_IND_PUSH_TR)
+     )
+    ;;---
+    (set (match_operand:DI 1 "gp_register_operand" "")
+         (unspec_volatile:DI [ (reg:DI TR_REGNUM) ] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (reg:QIHISI2 TR_REGNUM)
+         (unspec_volatile:QIHISI2 [(reg:QIHISI2 TR_REGNUM)
+                                   (match_operand:QIHISI2 2 "gp_register_operand" "")]
+             UNSPEC_PUSH_TR)
+    )
+    ;;---
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (sign_extend:DI (match_operand:QIHISI2 3 "register_operand" ""))
+    )
+    ;;---
+  ]
+  "(ivm64_peep_enabled(IVM64_PEEP2_INDPUSH_POP_PUSH_SIGNX)
+   && (REGNO(operands[0]) == TR_REGNUM)
+   && (REGNO(operands[3]) == TR_REGNUM)
+   && (REGNO(operands[1]) == REGNO(operands[2]))
+   && (GET_MODE_SIZE(GET_MODE(operands[3]))
+       > GET_MODE_SIZE(GET_MODE(SET_SRC(peep2_next_insn(0))))))
+  "
+  [
+    ;;---
+    (set (reg:QIHISI1 TR_REGNUM)
+         (unspec_volatile:QIHISI1 [(mem:QIHISI1
+                                       (match_dup:DI 0))]
+             UNSPEC_IND_PUSH_TR)
+     )
+    ;;---
+    (set (match_dup:DI 1)
+         (unspec_volatile:DI [ (reg:DI TR_REGNUM) ] UNSPEC_POP_TR)
+    )
+    ;;---
+    (set (reg:QIHISI2 TR_REGNUM)
+         (unspec_volatile:QIHISI2 [(reg:QIHISI2 TR_REGNUM)
+                                   (match_dup:QIHISI2 2)]
+             UNSPEC_PUSH_TR)
+    )
+    ;;---
+  ]
+  {
+  }
+)
+
 ;; -------------------------------------------------------------------------
 ;; Assembly Peepholes
 ;; -------------------------------------------------------------------------
@@ -2655,6 +3062,33 @@
 (define_peephole
   [
     ;;---
+    (set (match_operand:QIHISIDI 0 "gp_register_operand" "")
+              (unspec_volatile:QIHISIDI [(reg:QIHISIDI TR_REGNUM)] UNSPEC_POP_TR)
+     )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+              (unspec_volatile:DI [(reg:DI TR_REGNUM)
+                                (match_operand:DI 1 "gp_register_operand" "")]
+               UNSPEC_PUSH_TR)
+      )
+    ;;---
+  ]
+  "ivm64_peep_enabled(IVM64_PEEP1_POP_PUSH)
+   && (!ivm64_prolog_fast_pop)
+   && (REGNO(operands[0]) == REGNO(operands[1]))
+  "
+  {
+    output_asm_insn("load8! &0", NULL);
+    ivm64_stack_extra_offset += + UNITS_PER_WORD;
+    ivm64_output_pop(operands[0], DImode);
+    ivm64_stack_extra_offset += - UNITS_PER_WORD;
+    return "";
+  }
+)
+
+(define_peephole
+  [
+    ;;---
     (set (reg:DI TR_REGNUM)
               (unspec_volatile:DI [(reg:DI TR_REGNUM)
                                 (match_operand 0 "gp_register_operand" "")]
@@ -2690,7 +3124,7 @@
     ;;---
     (set (reg:DI TR_REGNUM)
               (unspec_volatile:DI [(reg:DI TR_REGNUM)
-                                (match_operand:DI 0 "arithmetic_operand" "")]
+                                (match_operand:DI 0 "pushable_ext_operand" "")]
                UNSPEC_PUSH_TR)
      )
     ;;---
@@ -2722,7 +3156,7 @@
     ;;---
     (set (reg:DI TR_REGNUM)
               (unspec_volatile:DI [(reg:DI TR_REGNUM)
-                                (match_operand:DI 0 "arithmetic_operand" "")]
+                                (match_operand:DI 0 "pushable_ext_operand" "")]
                UNSPEC_PUSH_TR)
      )
     ;;---
@@ -2789,6 +3223,51 @@
     fprintf(asm_out_file, "\t%s\n", ivm64_rtxop2insn(operands[4]));
     return "";
    }
+)
+
+(define_peephole
+  [
+    ;;---
+    (set (reg:DI TR_REGNUM)
+              (unspec_volatile:DI [(reg:DI TR_REGNUM)
+                                (match_operand 0 "pushable_ext_operand" "")]
+               UNSPEC_PUSH_TR)
+     )
+    ;;---
+    (set (reg:DI TR_REGNUM)
+         (match_operator:DI 3 "binary_operator" [(reg:DI TR_REGNUM)
+                  (match_operand:DI 1 "arithmetic_operand" "")])
+    )
+    ;;---
+    (set (match_operand:DI 2 "gp_register_operand" "")
+              (unspec_volatile:DI [(reg:DI TR_REGNUM)] UNSPEC_POP_TR)
+    )
+    ;;---
+  ]
+  "( ivm64_peep_enabled(IVM64_PEEP1_PUSH_BINOP_POPAR)
+     && (REGNO(operands[2]) == AR_REGNUM)
+     && (REGNO(operands[0]) != AR_REGNUM)
+     && (! rtx_equal_p(stack_pointer_rtx, operands[0]))
+     && (! reg_mentioned_p(operands[2], operands[0]))
+     && (! reg_mentioned_p(operands[2], operands[1]))
+     && (ivm64_stack_extra_offset == 0)
+     && (ivm64_gpr_offset == 0)
+     && (emitted_push_cfun == emitted_pop_cfun)
+   )"
+  {
+
+   ivm64_output_setsp(asm_out_file, 1);
+   ivm64_stack_extra_offset += - UNITS_PER_WORD;
+
+   ivm64_output_push(operands[0], DImode);
+
+   ivm64_stack_extra_offset += + UNITS_PER_WORD;
+   ivm64_output_push(operands[1], DImode);
+
+   fprintf(asm_out_file, "\t%s\n", ivm64_rtxop2insn(operands[3]));
+
+   return "";
+  }
 )
 
 (define_peephole

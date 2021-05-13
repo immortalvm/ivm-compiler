@@ -162,7 +162,20 @@ do
 done
 
 # A unique object id to be appended as suffix to local labels
-export OBJID=o`echo "$OBJECT" | md5sum | cut -b1-6`
+FILENAME=`gawk -F'"' '/^#\s*\.file\s+([[:print:]]+)$/{
+                            name=$2;
+                            gsub(/[^a-zA-Z0-9\.]+/, "_", name);
+                            print name;
+                            exit
+                        }' < "$ASM"`
+
+
+if ! test -z "$FILENAME"; then
+    export OBJID="$FILENAME"
+else
+    export OBJID=o`echo "$OBJECT" | md5sum | cut -b1-6`
+fi
+
 
 verbose && >&2 echo "ivm64-as ----------------------------------------"
 verbose && >&2 echo "OBJECT=$OBJECT | ASM=$ASM | OBJID=$OBJID"
@@ -174,5 +187,5 @@ then
     echo -n                                                     > "$OBJECT"
     echo "##:ivm64:obj-id: ${OBJID}"                            >> "$OBJECT"
     echo "# This is a GCC-generated ivm64 assembly object file" >> "$OBJECT"
-    locallize "$ASM" "_$OBJID"                                  >> "$OBJECT"
+    locallize "$ASM" ".$OBJID"                                  >> "$OBJECT"
 fi

@@ -199,7 +199,7 @@ read -d '' IVMSHEBANG << 'EOF'
 ##:ivm64: #     export IVM_INDIR=/tmp/in
 ##:ivm64: #     ./a.out 1 2 3
 ##:ivm64: # next lines are executed by /bin/sh
-##:ivm64: F="!FN!"; if [ -f "${F}.b" -a "${F}.b" -nt "${F}" ] ; then echo "Using existing ${F}.b binary"; else if ! which ivm > /dev/null 2>/dev/null; then echo "Application 'ivm' not found in PATH" ; exit 254; else ivm as  --bin "${F}.b" --sym "${F}.sym" "${F}" 3>&2 2>&1 1>&3; fi; fi
+##:ivm64: F="!FN!"; (if [ -f "${F}.b" -a "${F}.b" -nt "${F}" ] ; then echo "Using existing ${F}.b binary"; else if ! which ivm > /dev/null 2>/dev/null; then echo "Application 'ivm' not found in PATH" ; exit 254; else ivm as  --bin "${F}.b" --sym "${F}.sym" "${F}" ; fi; fi) 3>&2 2>&1 1>&3
 ##:ivm64: (if which "${IVM_EMU}" > /dev/null; then echo "Simulating with IVM_EMU=$IVM_EMU"; else echo "IVM_EMU not set or simulator not found; trying with 'ivm'"; if ! which ivm > /dev/null 2>/dev/null; then echo "Application 'ivm' not found in PATH" ; exit 254; else echo "Using 'ivm run'"; fi; fi) 3>&2 2>&1 1>&3
 ##:ivm64: trap 'rm -f !FN!_cmd_' EXIT HUP INT TERM QUIT; export F="!FN!"; if ! which "${IVM_EMU}" > /dev/null; then IVM_EMU="ivm run"; fi; ARG_FILE=/proc/$PPID/cmdline; ARG_FILE_OPT=; if test -f "$ARG_FILE"; then cut -d '' -f 3- $ARG_FILE | tr -d $'\\n' > !FN!_cmd_; ARG_FILE_OPT="-a !FN!_cmd_"; fi; OUT_DIR_OPT=; test -d "$IVM_OUTDIR" && OUT_DIR_OPT="-o $IVM_OUTDIR";  IN_DIR_OPT=; test -d "$IVM_INDIR" && IN_DIR_OPT="-i $IVM_INDIR"; (echo; ${IVM_EMU} ${OUT_DIR_OPT} ${IN_DIR_OPT} ${ARG_FILE_OPT} -m ${IVM_MAXMEM:-67108864} "${F}.b") 3>&2 2>&1 1>&3; S=$?; exit $S
 ##:ivm64: exit 0
@@ -560,6 +560,19 @@ EOC
         # in libgloss. It must point to the start of heap zone, which is achieved
         # with the last 'space' invocation that appears in the code
         IVM64_HEAP_START=__IVM64_heap_pointer__
+
+        R="\s*(.XSC|${IVM64_HEAP_START})\s*:"
+        if egrep -q "$R" "$OUTPUTTMP"
+        then
+            egrep -v  "$R" "$OUTPUTTMP" > "${OUTPUTTMP}__"
+            mv  "${OUTPUTTMP}__" "$OUTPUTTMP"
+        fi
+
+        echo "EXPORT .XSC"     >> "$OUTPUTTMP"
+        echo ".XSC:"           >> "$OUTPUTTMP"
+        echo -e "\tdata8 [0]"  >> "$OUTPUTTMP"
+
+        echo "EXPORT $IVM64_HEAP_START" >> "$OUTPUTTMP"
         echo "$IVM64_HEAP_START:" >> "$OUTPUTTMP"
         echo -e "\tspace 1"       >> "$OUTPUTTMP"
 

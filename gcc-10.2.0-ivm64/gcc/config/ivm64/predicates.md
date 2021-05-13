@@ -6,7 +6,7 @@
 ;;  Sergio Romero Montiel
 ;;  Oscar Plata Gonzalez
 ;;
-;; Date: Oct 2019 - Dec 2020
+;; Date: Oct 2019 - May 2021
 
 ;; Remember that predicate names must end with "_operand"
 
@@ -123,6 +123,16 @@
         ;
 })
 
+(define_predicate "pushable_ext_operand"
+   (match_test "true")
+ {
+   rtx addr = NULL;
+   if (GET_CODE(op) == MEM) addr = XEXP(op,0);
+   return pushable_operand(op, mode)
+          || (addr && MEM_INDIRECT_P(addr))
+          || (addr && MEM_INDIRECT_RELATIVE_P(addr))
+   ;
+ })
 
 (define_predicate "binary_operator"
   (match_code "plus,minus,mult,div,mod,udiv,umod,ior,xor,and,lshiftrt,ashiftrt,ashift"))

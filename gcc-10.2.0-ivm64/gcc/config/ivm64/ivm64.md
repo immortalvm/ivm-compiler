@@ -7,7 +7,7 @@
  *  Sergio Romero Montiel
  *  Oscar Plata Gonzalez
  *
- * Date: Oct 2019 - Dec 2020
+ * Date: Oct 2019 - May 2021
  *
  */
 
@@ -58,6 +58,8 @@
   UNSPEC_PRINT
   UNSPEC_AR_OFFSET
   UNSPEC_EXTRA_OFFSET
+  ;;
+  UNSPEC_NONLOCAL_GOTO
   ]
 )
 
@@ -569,9 +571,9 @@
   [(set (pc)
         (if_then_else
           (leu (minus:DI
-                    (match_operand:DI 0 "" "")
-                    (match_operand:DI 1 "" ""))
-              (match_operand:DI 2 "" ""))
+                    (match_operand 0 "" "")
+                    (match_operand:SI 1 "" ""))
+              (match_operand:SI 2 "" ""))
           (mem:DI (plus:DI (label_ref (match_operand 3 "" ""))
                            (mult:DI (minus:DI (match_dup 0)
                                               (match_dup 1))
@@ -787,6 +789,43 @@
    ""
    ""
 )
+
+;; Define nonlocal_gotos to be able to jump to outer labels when
+;; declaring nested functions
+(define_expand "nonlocal_goto"
+  [(set (pc)
+	(unspec_volatile [(match_operand 0 "") ;; fp (ignore)
+			  (match_operand 1 "") ;; target
+			  (match_operand 2 "") ;; sp
+			  (match_operand 3 "") ;; ?
+			  ] UNSPEC_NONLOCAL_GOTO))
+   ]
+  ""
+  "emit_jump_insn (gen_nonlocal_goto_insn (operands[0], operands[1], operands[2], operands[3]));
+   emit_barrier ();
+   DONE;"
+  )
+
+(define_insn "nonlocal_goto_insn"
+  [(set (pc)
+	(unspec_volatile [(match_operand 0 "" "") ;; fp (ignore)
+			  (match_operand 1 "" "im") ;; target
+			  (match_operand 2 "" "im") ;; sp
+			  (match_operand 3 "" "im") ;; ?
+			  ] UNSPEC_NONLOCAL_GOTO))
+   ]
+  ""
+  {
+    ivm64_output_push(operands[2], DImode);
+    ivm64_output_pop(stack_pointer_rtx, DImode);
+
+    ivm64_output_push(operands[1], DImode);
+    output_asm_insn ("jump", NULL);
+
+    return "";
+  }
+)
+
 
 
 ;;-------------------------------------------------------------------------

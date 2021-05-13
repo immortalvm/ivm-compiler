@@ -7,7 +7,7 @@
  *  Sergio Romero Montiel
  *  Oscar Plata Gonzalez
  *
- * Date: Oct 2019 - Nov 2020
+ * Date: Oct 2019 - May 2021
  *
  */
 
@@ -22,7 +22,7 @@
 #define TARGET_CPU_CPP_BUILTINS() ivm64_cpu_cpp_builtins(pfile)
 
 /* This macro is used by ivm.c:ivm64_asm_file_start() */
-#define IVM64_GCC_VERSION "2.0"
+#define IVM64_GCC_VERSION "2.1"
 #define VERSION_INFO "GCC Cross Compiler for ivm64, version " IVM64_GCC_VERSION " (" __DATE__ ", " __TIME__ ")"
 
 
@@ -556,9 +556,11 @@ enum reg_class
    memory reference at the proper offset from the start of the
    trampoline. On a RISC machine, it may be necessary to take out
    pieces of the address and store them separately. */
-/* Trampolines are not supported by this target */
-#define TARGET_ASM_TRAMPOLINE_TEMPLATE NULL
-#define TRAMPOLINE_SIZE 0
+/* Trampolines for Nested Functions.  */
+#define TRAMPOLINE_SIZE (32)
+/* Alignment required for trampolines, in bits.  */
+#define TRAMPOLINE_ALIGNMENT (64)
+
 
 
 /** LIBRARY CALLS **/
@@ -1069,12 +1071,21 @@ enum ivm64_peephole2 {
  IVM64_PEEP2_PUSH_ADD_POP_PUSH_IND_POP      ,
  IVM64_PEEP2_PUSH_ADD_POP_PUSH_IND_OFFSET_POP,
  IVM64_PEEP2_MOVE_MOVE_MOVE                 ,
+ IVM64_PEEP2_POP_PUSH_BINOP_COMMUTATIVE     ,
+ IVM64_PEEP2_POP_PUSH_BINOP_SUB             ,
+ IVM64_PEEP2_PUSH_POP_CASESI                ,
+ IVM64_PEEP2_PUSH_SIGNX_POP_CASESI          ,
+ IVM64_PEEP2_SIGNX_SIGNX                    ,
+ IVM64_PEEP2_PUSH_SIGNX                     ,
+ IVM64_PEEP2_PUSH_POP_PUSH_SIGNX            ,
+ IVM64_PEEP2_INDPUSH_POP_PUSH_SIGNX         ,
  IVM64_PEEP1_MOVE_PUSH_POP                  ,
  IVM64_PEEP1_SHIFTRU63_AND                  ,
  IVM64_PEEP1_PUSHAR_BINOP_POPAR             ,
  IVM64_PEEP1_PUSH_COMMUTATIVE_POPAR         ,
  IVM64_PEEP1_PUSH_SUB_POPAR                 ,
  IVM64_PEEP1_PUSH_BINOP_BINOP_POPAR         ,
+ IVM64_PEEP1_PUSH_BINOP_POPAR               ,
  IVM64_PEEP1_PUSH_ADD                       ,
  IVM64_PEEP1_PUSHAR_UNARY_POPAR             ,
  IVM64_PEEP1_PUSHAR_SIGNX_POPAR             ,
