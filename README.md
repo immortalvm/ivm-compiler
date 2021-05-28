@@ -707,7 +707,11 @@ Note that as the simulation may run slow after including all the standard librar
 ## Credits
 
  IVM64 target ported by:
+    
+Main developers: Eladio Gutierrez, Sergio Romero, Oscar Plata
 
-Tedial Media SL, 2021.
 University of Malaga, 2021.
+    
+Tedial Media SL, 2021.
+
 
