@@ -689,7 +689,6 @@ A unique ABI is used for all functions regardless the number of arguments (no ar
 The IVM64 GCC compiler is also available for testing purposes through the web-based Compiler Explorer tool.
 
 This tool can be accessed through the URL:  https://ivm.ac.uma.es/ce-layout.html.  
-You need a user ("gcc") and a password ("ivm64").
 
 A simplified view of the tool is also available in: https://ivm.ac.uma.es.
 
@@ -709,12 +708,6 @@ Note that as the simulation may run slow after including all the standard librar
 
  IVM64 target ported by:
 
- Eladio Gutierrez Carrasco,
-
- Sergio Romero Montiel, and
-
- Oscar Plata Gonzalez. 
-
- University of Malaga, 2021.
-
+Tedial Media SL, 2021.
+University of Malaga, 2021.
 
