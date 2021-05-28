@@ -710,8 +710,7 @@ Note that as the simulation may run slow after including all the standard librar
     
 Main developers: Eladio Gutierrez, Sergio Romero, Oscar Plata
 
-University of Malaga, 2021.
-    
+University of Malaga, 2021.   
 Tedial Media SL, 2021.
 
 
