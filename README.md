@@ -692,15 +692,7 @@ This tool can be accessed through the URL:  https://ivm.ac.uma.es/ce-layout.html
 
 A simplified view of the tool is also available in: https://ivm.ac.uma.es.
 
-Some information about using the tool follows:
-
-- The tool shows a view composed of 5 panels (see PDF file included in the 'snapshot' folder), from left to right: (1) the C source code; (2) the resulting assembly code; (3) the resulting execution in the  iVM simulator (ivm as-run); (4) the resulting iVM simulation trace (ivm as-trace); (5) the resulting execution on a x86 architecture to compare results.
- 
-- It is very important to select the ivm64 compiler (that is, ivm64 gcc-8.3.0, which it is by default) in the assembly panel (number (2)). In that panel you can also can select the gcc-7.4.0 (x86-64) compiler.
-
-- The panels 'ivm as-run' and 'ivm as-trace' can be opened by clicking in the tools icon at the top of the assembly code panel (number (2)).
-
-- There a number of C code examples, that can be selected by clicking in the disk icon at the top of the C source code panel (number (1)).
+Some credentials may be necessary: user: ```gcc```, password: ```ivm64```    
 
 Note that as the simulation may run slow after including all the standard libraries, you may wish to close the execution panel in order to browse the compiled assembly without waiting the execution ends.
 
