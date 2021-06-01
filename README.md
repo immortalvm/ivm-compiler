@@ -696,13 +696,4 @@ Some credentials may be necessary: user: ```gcc```, password: ```ivm64```
 
 Note that as the simulation may run slow after including all the standard libraries, you may wish to close the execution panel in order to browse the compiled assembly without waiting the execution ends.
 
-## Credits
-
- IVM64 target ported by:
-    
-Main developers: Eladio Gutierrez, Sergio Romero, Oscar Plata
-
-University of Malaga, 2021.   
-Tedial Media SL, 2021.
-
 
