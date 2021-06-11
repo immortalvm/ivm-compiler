@@ -81,6 +81,10 @@ Prerequisites
 
     EITHER install the required packages described in
            $GCC_SRCDIR/INSTALL/prerequisites.html for your system,
+    For example, In a deb based linux distribution, it can be installed as:
+        sudo apt update
+        sudo apt install libgmp-dev libmpfr-dev libmpc-dev libisl-dev libzstd-dev
+    
 
     OR build them from sources:
         cd "$GCC_SRCDIR"
