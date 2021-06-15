@@ -153,7 +153,7 @@ Cleaning
 ## Evaluation <a name="comparison">
 
 Here you can find some figures comparing different optimization levels:
-- codes have been compiled and executed on a Intel Core i7-3770 @3.40GHz server 
+- codes have been compiled and executed on a Intel Core i7-3770 @3.40GHz server running a linux kernel 4.15.0
 - compiler version **ivm64-2.1** based on **GCC 10.2.0** was used
 - binaries were generated with **ivm v0.37** (be aware that ISA changed in this version)
 - simulations were carried out with the **yet another (fast) IVM emulator v1.17**
