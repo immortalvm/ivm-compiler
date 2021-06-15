@@ -216,6 +216,13 @@ To test the compiler, do the following:
   export PATH=/path/to/ivm/bin:${PATH}
   ```
 
+* [optional] You may wish to define an emulator to use and the memory limit:
+    
+  ```    
+  export IVM_MAXMEM=2000000000
+  export IVM_EMU=/path/to/ivm_emu_fast
+  ```
+
 * Go to the example folder:
 
   ```
