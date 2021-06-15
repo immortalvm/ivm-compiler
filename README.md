@@ -20,7 +20,7 @@
 
 This project presents the current released version of the IVM64 GCC compiler and toolchain (```as``` and ```ld```).
 
-The last version is **ivm64-2.1**, which is based on **GNU CC v10.2.0** (note that previous versions were based on gcc 8.3.0).
+The last version is **ivm64-2.1**, which is based on **GNU CC v10.2.0**.
 
 The **main features** of the IVM64 GCC compiler are:
 
