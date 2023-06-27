@@ -1,0 +1,225 @@
+#!/bin/bash
+
+# Preservation Virtual Machine Project
+#
+# An assembly tool for GNU CC compiler ivm64 target as a
+# replacement of the UNIX assembler 'as', simply by copying the
+# assembly file to the object file.
+# A unique id is added in the first line to facilitate the
+# linking.
+#
+# Authors:
+#  Eladio Gutierrez Carrasco
+#  Sergio Romero Montiel
+#  Oscar Plata Gonzalez
+#
+# Date: Oct 2019 - Feb-Dec 2020
+
+# Expected syntax:
+#
+#    as [some options] [-mverbose] -o objfile filename.s
+#
+# The last argument is the name of the assembly input file
+# ending with '.s'
+
+# Target specific options:
+#   -mverbose
+#       show extra information
+#   -mquit
+#       do nothing, only load functions if sourced (source as -mquit)
+
+# The version of this as script
+export ASVERSION="IVM64 assembly object generator 2.1"
+
+# Set to something to force verbose mode
+export VERBOSE=
+
+export LANG=C
+export LC_ALL=C
+
+#---------------------------------------------------
+# Is verbose enabled
+#---------------------------------------------------
+verbose() { ! test -z $VERBOSE; }
+
+#---------------------------------------------------
+# Requirements for as and ld
+#---------------------------------------------------
+in_path() { which $1 >& /dev/null || ( echo $1 not found, check the PATH && kill -TERM $$); }
+
+check_bash_version() {
+ echo $BASH_VERSION \
+    | gawk -F'.' -v MAJOR="$1" -v MINOR="$2" '{
+                   if (($1<MAJOR)|| ($1==MAJOR && $2<MINOR))
+                       {print "At least BASH version " MAJOR "." MINOR " required";
+                        exit 1;}
+                  }'
+}
+
+check_requirements() {
+    # Required bash 4.4 at least
+    check_bash_version 4 4 || kill -TERM $$
+
+    # Other required commands
+    in_path ar
+    in_path basename
+    in_path csplit
+    in_path cat
+    in_path cut
+    in_path dirname
+    in_path cmp
+    in_path egrep
+    in_path file
+    in_path gawk
+    in_path grep
+    in_path md5sum
+    in_path readlink
+    in_path rm
+    in_path sed
+    in_path sort
+    in_path sh
+    in_path tr
+}
+
+#---------------------------------------------------
+#  Rename local labels of a file containing ivm64
+#  assembly to make them uniq
+#  The "locallized" file is printed to stdout
+#  Usage:
+#         locallize filename suffix
+#---------------------------------------------------
+locallize(){
+    filename="$1"
+    suffix="$2"
+    substcmd_loc0="s/\([[:space:]]\+\|\([^<>]=\)\|:\|)\|]\)/\1 /g"
+    Lo=`gawk 'BEGIN{
+                    loclabellist=""
+              }
+              match($0, /^\s*([a-zA-Z_][a-zA-Z0-9_\.]*)\s*(:|=)/, a) {loclabel[a[1]]=1}
+              match($0, /^\s*EXPORT\s+([a-zA-Z_][a-zA-Z0-9_\.]*)/, b) {export[b[1]]=1}
+
+              # in c++ all these labels are always globals?
+              #     - starting with _Z[TVSI] are global (mangling)
+              #     - starting with _GLOBAL__ (initializators/destructors)
+              match($0, /^\s*((_Z[TVSI]|_GLOBAL__).*)\s*(:|=)/, b) {export[b[1]]=1}
+
+              END{
+                    for (l in loclabel)
+                         if (!export[l])
+                            loclabellist = loclabellist "\\\\|" l
+                    gsub(/^../, "", loclabellist)      # Remove first dangling \|
+                    gsub(/\./, "\\\\.", loclabellist)  # Escape dots
+                    if (loclabellist) { printf loclabellist }
+              }' "$filename"`
+
+    if ! test -z "${Lo}"; then
+        suffix_s="\.s${suffix}" # notice that the "." is escaped
+
+        substcmd_loc1="/[!:=\[]/ s/\(^\|[^a-zA-Z0-9_\.]\)\(${Lo}\)\([[:space:]]\|:\|=\|\]\|)\|$\)/\1\2${suffix_s}\3/g"
+
+        substcmd_loc2="/${suffix_s}/ s/\(:[[:space:]]*[[:alnum:]_\.]\+\)${suffix_s}/\1/g"
+        substcmd_loc3="/${suffix_s}/ s/\([[:alnum:]_\.]\+\)${suffix_s}\([[:space:]]\+\[\)/\1\2/g"
+        substcmd_loc4="/${suffix_s}/ s/\(([[:space:]]*[[:alnum:]_\.]\+\)${suffix_s}\([^[:alnum:]_\.]\|$\)/\1\2/g"
+
+        substcmd_loc5="/${suffix_s}/ s/\(([[:space:]]*\(\(<=\|>=\|>>\|<<\|<\|>\|%\|\/\)\(s\|u\)\)\)${suffix_s}\([^[:alnum:]_\.]\|$\)/\1\5/g"
+    fi
+    substcmd_loc6="s/\([[:space:]]\|=\|:\|)\|]\) /\1/g"
+
+    substcmd_loc="$substcmd_loc1; $substcmd_loc2; $substcmd_loc3; $substcmd_loc4; $substcmd_loc5; $substcmd_loc6"
+
+    suffix_l=".l${suffix}"   # notice that the "." need not to be escaped as used only in the second part of s/.../...
+    substcmd_dotl="s/\(^\|[^[:alnum:]]\)\(\.[LD][a-zA-Z0-9_\.]*\)\([^[:alnum:]]\|$\)/\1\2${suffix_l}\3/g"
+
+    substcmd="$substcmd_loc0; ${substcmd_dotl}; ${substcmd_loc}"
+
+    if test ${#substcmd} -gt 65535
+    then
+        echo "${substcmd}" | sed -f - "$filename"
+    else
+        cat "$filename" | sed "$substcmd_loc0" | sed "$substcmd_dotl" \
+                        | sed "$substcmd_loc1" | sed "$substcmd_loc2" | sed "$substcmd_loc3" \
+                        | sed "$substcmd_loc4" | sed "$substcmd_loc5" | sed "$substcmd_loc6"
+    fi
+}
+
+# First of all check requirements
+check_requirements
+
+# Process arguments
+while test $# -gt 0
+do
+    case "$1" in
+        --version)
+
+            echo $ASVERSION
+            exit 0
+            ;;
+        -o)
+            OBJECT="$2"
+            shift
+            ;;
+        -mquit)
+            # if invoked as "source as" then return
+            # but if executed, exit
+            [[ "${BASH_SOURCE[0]}" != "${0}" ]] && return
+            exit
+            ;;
+        -mverbose)
+            # enable verbose
+            VERBOSE=1
+            ;;
+         *)
+            ASM="$1"
+            ;;
+    esac
+    shift
+done
+
+as_get_filename() {
+  gawk -F'"' '/^#\s*\.file\s+([[:print:]]+)$/{
+                            name=$2;
+                            gsub(/[^a-zA-Z0-9\.]+/, "_", name);
+                            print name;
+                            exit
+                        }' < "$1"
+}
+
+as_get_first_export() {
+  gawk '/^\s*EXPORT\s+/{ print $2; exit; }' < "$1"
+}
+
+as_get_first_label() {
+  gawk -F: '/^\s*((\.[A-KM-Za-z0-9_\.]*)|([A-Za-z0-9_][A-Za-z0-9_\.]*))\s*:/{ print $1; exit; }' < "$1"
+}
+
+as_get_first_symbol() {
+    local E=`as_get_first_export "$1"`
+    test -z "$E" &&  E=`as_get_first_label "$1"`
+    echo "$E"
+}
+
+# A unique object id to be appended as suffix to local labels
+FILENAME=`as_get_filename "$ASM"`
+if ! test -z "$FILENAME"; then
+    export OBJID="$FILENAME"
+    PREF=`as_get_first_symbol "$ASM"`
+    if ! test -z "$PREF"; then
+        OBJID=`echo "$PREF" | md5sum | cut -b1-3`.$OBJID
+    fi
+else
+    export OBJID=o`echo "$OBJECT" | md5sum | cut -b1-6`
+fi
+
+
+verbose && >&2 echo "ivm64-as ----------------------------------------"
+verbose && >&2 echo "OBJECT=$OBJECT | ASM=$ASM | OBJID=$OBJID"
+
+# Assemble
+if test -f "$ASM"
+then
+    # Emulating assembling by copying
+    echo -n                                                     > "$OBJECT"
+    echo "##:ivm64:obj-id: ${OBJID}"                            >> "$OBJECT"
+    echo "# This is a GCC-generated ivm64 assembly object file" >> "$OBJECT"
+    locallize "$ASM" ".$OBJID"                                  >> "$OBJECT"
+fi

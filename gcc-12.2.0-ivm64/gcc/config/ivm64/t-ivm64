@@ -1,0 +1,45 @@
+# Preservation Virtual Machine Project
+# Complementary rules for GNU CC's makefile for ivm64 target
+#
+# Authors:
+#  Eladio Gutierrez Carrasco
+#  Sergio Romero Montiel
+#  Oscar Plata Gonzalez
+#
+# Date: Oct 2019 - Jun 2023
+
+ivm64dir=$(srcdir)/config/ivm64
+
+install: install-ivm64-binutils build-install-ivm64-as
+	echo "Making t-ivm64 --------------------------------------------------------"
+	echo "ivm64dir="$(ivm64dir)
+	echo "srcdir="$(srcdir)
+	echo "top_builddir="$(top_builddir)
+	echo "exec_prefix="$(exec_prefix)
+	echo "bindir="$(bindir)
+	echo "libdir="$(libdir)
+	echo "libsubdir="$(libsubdir)
+	echo "libexecsubdir="$(libexecsubdir)
+	echo "target_subdir="$(target_subdir)
+
+install-ivm64-binutils:
+	echo "t-ivm64 installing 'as' and 'ld' ---------------------------------------"
+	echo $(install-object-dir)
+	rm -f $(libexecsubdir)/as
+	rm -f $(libexecsubdir)/ld
+	cp -f $(ivm64dir)/as $(libexecsubdir)/as
+	cp -f $(ivm64dir)/ld $(libexecsubdir)/ld
+	chmod +x $(libexecsubdir)/as
+	chmod +x $(libexecsubdir)/ld
+
+build-install-ivm64-as:
+	echo "t-ivm64 building and installing 'ivm64-as' -----------------------------"
+	rm -rf $(top_builddir)/ivm64/asm2bin
+	mkdir -p $(top_builddir)/ivm64/asm2bin
+	cp -ar $(ivm64dir)/asm2bin/* $(top_builddir)/ivm64/asm2bin/
+	cd $(top_builddir)/ivm64/asm2bin/ ; make clean; make ; make clean-preprocessor
+	mkdir -p $(bindir)/asm2bin
+	find  $(top_builddir)/ivm64/asm2bin/ -type f -executable -name "as*" -exec cp -vf {}  $(bindir)/asm2bin/ \;
+	cp -vf $(top_builddir)/ivm64/asm2bin/ivm64-as $(bindir)/
+	chmod +x $(bindir)/ivm64-as
+

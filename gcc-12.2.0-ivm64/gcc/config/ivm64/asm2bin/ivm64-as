@@ -1,0 +1,200 @@
+#!/bin/bash
+# Translate an ivm64 assembly file, as produced by ivm64-gcc, to binary
+# Usage:
+#  # By default it generates <prog>.b and <prog>.sym
+#    ivm64-as a.out  # generating a.b, a.sym
+#
+#  # Using an entry point
+#    ivm64-as -e entry_point a.out
+#
+#  # Defining output files (binary and symbols)
+#    ivm64-as --bin a.bin --sym a.sym a.out
+#
+#  # Using the preprocessor to solve complex aliases
+#  # (only one-line aliases are allowed)
+#    ivm64-as -p a.out
+#
+#  # Do not optimize (bigger output)
+#    ivm64-as -noopt a.out
+#
+#  # When optimizing set the maximum number of passes until
+#  # converging in size (if exceeded, it re-runs with no optimization)
+#     IVM64_BISON_MAX_PASSES=100 ivm64-as a.out
+
+CURDIR=`dirname $0`
+
+INPUTFILE=
+ENTRY_POINT=
+OUTPUT_BIN=
+OUTPUT_SYM=
+PREPROCESS=
+NOOPTAS1=
+NOOPTASOPT1=
+while test $# -gt 0 ; do
+    case $1 in
+     -e)
+          shift
+          ENTRY_POINT="-e $1"
+          shift
+          ;;
+     --bin)
+          shift
+          OUTPUT_BIN="$1"
+          shift
+          ;;
+     --sym)
+          shift
+          OUTPUT_SYM="$1"
+          shift
+          ;;
+     -p)
+          PREPROCESS=1
+          shift
+          ;;
+     --noopt-as1|-noopt-as1)
+          # Do not optimize for size (as1)
+          NOOPTAS1="-noopt"
+          shift
+          ;;
+     --noopt-asopt1|-noopt-asopt1)
+          # Do not make optimizations (asopt1)
+          NOOPTASOPT1=1
+          shift
+          ;;
+     --noopt|-noopt)
+          # Do not optimize at all
+          NOOPTAS1="-noopt"
+          NOOPTASOPT1=1
+          shift
+          ;;
+     -*|--*)
+          >&2 echo "Unknown option $1"
+          exit 1
+          ;;
+     *)
+          if test -f "$1"; then
+              INPUTFILE="$1"
+          else
+              >&2 echo "File '$1' not found"
+              exit 1
+          fi
+          shift
+          ;;
+    esac
+done
+
+findexec() { find "$CURDIR" -executable -name "$1" | sort | head -1 ; }
+
+# Preprocessor executable files
+ASPP0=`findexec aspp0`
+ASPP1=`findexec aspp1`
+# Assembler files
+AS0=`findexec as0`
+AS1=`findexec as1`
+# Optimizers
+ASOPT1=`findexec asopt1`
+
+# Show help if no file found
+scriptname=`basename $0`
+if test -z "$INPUTFILE"; then
+
+    test -x "$AS0" && "$AS0" -v
+
+    >&2 cat << INTRO
+Translate an ivm64 assembly file, as produced by ivm64-gcc, to binary
+Usage:
+ # By default it generates <prog>.b and <prog>.sym
+   $scriptname a.out  # generating a.b, a.sym
+
+ # Using an entry point
+   $scriptname -e entry_point a.out
+
+ # Defining output files (binary and symbols)
+   $scriptname --bin a.bin --sym a.sym a.out
+
+ # Using the preprocessor to solve complex aliases
+ # (only one-line aliases are allowed)
+   $scriptname -p a.out
+
+ # Do not optimize (bigger output)
+   $scriptname -noopt a.out
+
+ # When optimizing set the maximum number of passes until
+ # converging in size (if exceeded, it re-runs with no optimization)
+    IVM64_BISON_MAX_PASSES=100 $scriptname a.out
+
+INTRO
+    exit 1
+fi
+
+# Check if output file is not empty
+if test -z "$OUTPUT_BIN"; then
+    OUTPUT_BIN="${INPUTFILE%.*}.b"
+fi
+
+# If not sym file name defined, use $OUTPUT_BIN
+# replacing its extension (commonly '.b' or '.bin')
+# by '.sym' (if there is no extension add .sym)
+if test -z "$OUTPUT_SYM"; then
+    OUTPUT_SYM="$OUTPUT_BIN"
+    if test "$OUTPUT_SYM" == "${OUTPUT_SYM%.*}"; then
+        OUTPUT_SYM="${OUTPUT_SYM%.bin}".sym
+    else
+        OUTPUT_SYM="${OUTPUT_SYM%.*}".sym
+    fi
+fi
+
+
+check_exec(){
+    # Check if an executable exists
+    if ! test -x "$1" || ! test -f "$1" ; then
+        >&2 echo "Executable '$1' ($2) not found ('make' needed?)"
+        exit 3
+    fi
+}
+
+preprocess() {
+    if ! test -z "$PREPROCESS"; then
+         "$ASPP0" | "$ASPP1"
+         return $(( "${PIPESTATUS[0]}" || "${PIPESTATUS[1]}" ))
+    else
+         cat
+    fi
+}
+
+parse() {
+     if ! test -z "$NOOPTASOPT1"; then
+         # Run with any optimization (no optimization pass "asopt1" + do not optimize size "as1 --noopt")
+         "$AS0" $ENTRY_POINT | "$AS1"  $NOOPTAS1 -b "$OUTPUT_BIN" -s "$OUTPUT_SYM"
+         return $(( "${PIPESTATUS[0]}" || "${PIPESTATUS[1]}" ))
+     else
+         "$AS0" $ENTRY_POINT | "$ASOPT1" | "$AS1"  $NOOPTAS1 -b "$OUTPUT_BIN" -s "$OUTPUT_SYM"
+         return $(( "${PIPESTATUS[0]}" || "${PIPESTATUS[1]}" || "${PIPESTATUS[2]}" ))
+     fi
+}
+
+assemble() {
+     preprocess | parse
+     return $(( "${PIPESTATUS[0]}" || "${PIPESTATUS[1]}" ))
+}
+
+check_exec "$AS0"   as0
+check_exec "$AS1"   as1
+if test -z "$NOOPTASOPT1"; then
+    check_exec "$ASOPT1" asopt1
+fi
+if ! test -z "$PREPROCESS"; then
+    check_exec "$ASPP0" aspp0
+    check_exec "$ASPP1" aspp1
+fi
+
+if assemble < "$INPUTFILE"
+then
+    >&2 echo "Binary written to:  $OUTPUT_BIN"
+    >&2 echo "Symbols written to: $OUTPUT_SYM"
+else
+    test -f "$OUTPUT_BIN"  && rm -f "$OUTPUT_BIN"
+    test -f "$OUTPUT_SYM"  && rm -f "$OUTPUT_SYM"
+    >&2 echo "NO program written due to errors"
+    exit 2
+fi
