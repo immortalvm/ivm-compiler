@@ -2337,7 +2337,6 @@ Void_t* mALLOc(RARG bytes) RDECL size_t bytes;
 
 #else
 
-
   mchunkptr victim;                  /* inspected/selected chunk */
   INTERNAL_SIZE_T victim_size;       /* its size */
   int       idx;                     /* index for bin traversal */
@@ -2353,13 +2352,8 @@ Void_t* mALLOc(RARG bytes) RDECL size_t bytes;
 
   INTERNAL_SIZE_T nb  = request2size(bytes);  /* padded request size; */
 
-
   /* Check for overflow and just fail, if so. */
-#ifdef __ivm64__
-  if (nb > ((sizeof(INTERNAL_SIZE_T) == 8)?LONG_MAX:INT_MAX) || nb < bytes)
-#else
   if (nb > INT_MAX || nb < bytes)
-#endif
   {
     RERRNO = ENOMEM;
     return 0;
@@ -2825,11 +2819,7 @@ Void_t* rEALLOc(RARG oldmem, bytes) RDECL Void_t* oldmem; size_t bytes;
   nb = request2size(bytes);
 
   /* Check for overflow and just fail, if so. */
-#ifdef __ivm64__
-  if (nb > ((sizeof(INTERNAL_SIZE_T) == 8)?LONG_MAX:INT_MAX) || nb < bytes)
-#else
   if (nb > INT_MAX || nb < bytes)
-#endif
   {
     RERRNO = ENOMEM;
     return 0;

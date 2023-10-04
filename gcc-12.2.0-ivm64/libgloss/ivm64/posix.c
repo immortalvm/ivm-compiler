@@ -1,7 +1,7 @@
 /* note these headers are all provided by newlib - you don't need to provide them */
 #include <limits.h>
-#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/fcntl.h>
 #include <sys/times.h>
 #include <sys/errno.h>
@@ -34,18 +34,27 @@ int fchdir(int fd) {return -1;}
 int chmod(const char *pathname, mode_t mode) {return -1;}
 int fchmod(int fd, mode_t mode){return -1;}
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags){return -1;}
-long fpathconf(int fd, int name) {return -1;}
+long fpathconf(int fd, int name){return -1;}
 long pathconf(const char *path, int name) {return -1;}
 char *getcwd(char *buf, size_t size){return NULL;}
-char *get_current_dir_name(void) {return NULL;}
+char *get_current_dir_name(void){return NULL;}
 
-int ftruncate (int file, off_t length) {errno = ENOSYS; return -1;}
-int truncate (const char *path, off_t length) { errno = ENOSYS; return -1;}
+int ftruncate (int file, off_t length){errno = ENOSYS; return -1;}
+int truncate (const char *path, off_t length){errno = ENOSYS; return -1;}
 
 #include <time.h>
-int nanosleep(const struct timespec *req, struct timespec *rem) {return 0;}
+int nanosleep(const struct timespec *req, struct timespec *rem){return 0;}
 
 #include <dirent.h>
 long getdents(unsigned int fd, struct linux_dirent *dirp, unsigned int count){errno = ENOENT; return -1;}
-int openat(int dirfd, const char *pathname, int flags, ...) {errno=EACCES; return -1;}
+int openat(int dirfd, const char *pathname, int flags, ...){errno=EACCES; return -1;}
 int unlinkat(int dirfd, const char *pathname, int flags){errno=EACCES; return -1;}
+
+char *getlogin(void){errno=ENOENT; return NULL;}
+int issetugid(){return 0;}
+int getuid(void){return 0;}
+int geteuid(void){return 0;}
+void *getpwnam(const char *name){errno=ENOENT; return NULL;}
+void *getpwuid(int uid){errno=ENOENT; return NULL;}
+
+mode_t umask(mode_t mask){return 0;}

@@ -92,6 +92,7 @@ locallize(){
     filename="$1"
     suffix="$2"
     substcmd_loc0="s/\([[:space:]]\+\|\([^<>]=\)\|:\|)\|]\)/\1 /g"
+
     Lo=`gawk 'BEGIN{
                     loclabellist=""
               }
@@ -100,12 +101,19 @@ locallize(){
 
               # in c++ all these labels are always globals?
               #     - starting with _Z[TVSI] are global (mangling)
-              #     - starting with _GLOBAL__ (initializators/destructors)
-              match($0, /^\s*((_Z[TVSI]|_GLOBAL__).*)\s*(:|=)/, b) {export[b[1]]=1}
+              match($0, /^\s*(_Z[TVSI].*)\s*(:|=)/, d) {export[d[1]]=1}
+
+              # in c++ we will consider initialization/termination functions
+              # (aka. constructors/destructors) as local
+              #     - starting with _GLOBAL__
+              #     - having the ivm64 ctor/dtor clause (they must not be exported!)
+              #       For example:
+              #       #:ivm64:#DTOR _GLOBAL__sub_D__ZSt38hardware_destructive_interference_size
+              match($0, /^#:ivm64:#(C|D)TOR\s+([a-zA-Z_][a-zA-Z0-9_\.]*)/, c) {ctor[c[2]]=1;}
 
               END{
                     for (l in loclabel)
-                         if (!export[l])
+                         if (!export[l] || ctor[l])
                             loclabellist = loclabellist "\\\\|" l
                     gsub(/^../, "", loclabellist)      # Remove first dangling \|
                     gsub(/\./, "\\\\.", loclabellist)  # Escape dots
@@ -122,10 +130,13 @@ locallize(){
         substcmd_loc4="/${suffix_s}/ s/\(([[:space:]]*[[:alnum:]_\.]\+\)${suffix_s}\([^[:alnum:]_\.]\|$\)/\1\2/g"
 
         substcmd_loc5="/${suffix_s}/ s/\(([[:space:]]*\(\(<=\|>=\|>>\|<<\|<\|>\|%\|\/\)\(s\|u\)\)\)${suffix_s}\([^[:alnum:]_\.]\|$\)/\1\5/g"
+
+        substcmd_loc_ctor="/^\(\s*EXPORT\s\+\(${Lo}\)\)/ s//#~ \0/g";
     fi
     substcmd_loc6="s/\([[:space:]]\|=\|:\|)\|]\) /\1/g"
 
-    substcmd_loc="$substcmd_loc1; $substcmd_loc2; $substcmd_loc3; $substcmd_loc4; $substcmd_loc5; $substcmd_loc6"
+
+    substcmd_loc="$substcmd_loc1; $substcmd_loc2; $substcmd_loc3; $substcmd_loc4; $substcmd_loc5; $substcmd_loc6; $substcmd_loc_ctor"
 
     suffix_l=".l${suffix}"   # notice that the "." need not to be escaped as used only in the second part of s/.../...
     substcmd_dotl="s/\(^\|[^[:alnum:]]\)\(\.[LD][a-zA-Z0-9_\.]*\)\([^[:alnum:]]\|$\)/\1\2${suffix_l}\3/g"
@@ -138,7 +149,8 @@ locallize(){
     else
         cat "$filename" | sed "$substcmd_loc0" | sed "$substcmd_dotl" \
                         | sed "$substcmd_loc1" | sed "$substcmd_loc2" | sed "$substcmd_loc3" \
-                        | sed "$substcmd_loc4" | sed "$substcmd_loc5" | sed "$substcmd_loc6"
+                        | sed "$substcmd_loc4" | sed "$substcmd_loc5" | sed "$substcmd_loc6" \
+                        | sed "$substcmd_loc_ctor"
     fi
 }
 

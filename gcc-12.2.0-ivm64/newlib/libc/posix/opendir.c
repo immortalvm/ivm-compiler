@@ -41,7 +41,7 @@ static char sccsid[] = "@(#)opendir.c	5.11 (Berkeley) 2/23/91";
 
 #ifdef __ivm64__
     /* Enough space for direct; keep a multiple of 512 */
-    #define IVM_DDLEN0 (sizeof(struct dirent)*2)
+    #define IVM_DDLEN0 (sizeof(struct dirent)*16)
     #define IVM_DDLEN  ((IVM_DDLEN0 + 512L -1) & (-512L)) 
 #endif
 
@@ -67,6 +67,7 @@ _opendir_common(int fd)
     /* Adapt this size to our dirent entry */
 	dirp->dd_buf = malloc (IVM_DDLEN);
 	dirp->dd_len = IVM_DDLEN;
+	dirp->dd_size = 0;
     #endif
 
 	if (dirp->dd_buf == NULL) {

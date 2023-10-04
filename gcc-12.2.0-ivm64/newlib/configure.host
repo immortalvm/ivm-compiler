@@ -563,6 +563,10 @@ case "${host}" in
 	# Define nanosleep() in libgloss; sleep() and usleep() in libc/posix
 	# will be defined if defined -DHAVE_NANOSLEEP
 	newlib_cflags="${newlib_cflags} -DHAVE_NANOSLEEP"
+    # Avoid some not yet implemented functions as: dup2, waitpid, pipe, _open, _close, sigaction, seteuid, setegid, getgid, sched_setparam, setpgid vfork...:
+	newlib_cflags="${newlib_cflags} -D_NO_GETLOGIN -D_NO_GETPWENT -D_NO_GETUT -D_NO_GETPASS -D_NO_SIGSET -D_NO_POPEN -D_NO_POSIX_SPAWN -D_NO_WORDEXP"
+    # To compile functions in newlib/libc/stdio/mktemp.c like mkdtemp()
+	newlib_cflags="${newlib_cflags} -DHAVE_MKDIR"
     ;;
   m68hc11-*-*|m6811-*-*|m6812-*-*|m68hc12-*-*)
 	;;

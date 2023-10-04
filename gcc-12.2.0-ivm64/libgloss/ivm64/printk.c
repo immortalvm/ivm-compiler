@@ -51,7 +51,7 @@ int printk(const char *format,...)
    long q;                   // place for an argument that is a signed number
    unsigned long uq;         // place for an argument that is an unsigned numbers
    unsigned int base;        // base of representation (8, 10, 16)
-   unsigned int ucase = 0;   // 0: lowercase; 1: uppercase letters in hexa numbers
+   unsigned int ucase = 1;   // 0: lowercase; 1: uppercase letters in hexa numbers
    unsigned int islong = 0;  // fetch a 8 byte numbre rather than a 4 byte number
    unsigned int prefix = 0;  // prefix '0' for octal, and '0x' or '0X' for hexa depending on ucase
 
@@ -96,9 +96,10 @@ int printk(const char *format,...)
             goto arg_unsigned;
          case 'p':
 	    prefix = 1;
-         case 'X':
-            ucase = 1;
+            islong = 1;
          case 'x':
+            ucase = 0;
+         case 'X':
             base = 16;
          arg_unsigned:
             if (islong) uq = VA_ARG(arg, unsigned long);
@@ -126,6 +127,7 @@ int printk(const char *format,...)
             retval++;
             islong = 0;
             prefix = 0;
+            ucase = 1;
          }
       }
       else

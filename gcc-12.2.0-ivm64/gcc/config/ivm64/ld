@@ -213,6 +213,10 @@ export IVM64_LD_TMPDIR=${IVM64_LD_TMPDIR:-}
 # This regex should be tested case insensitive
 export IVM64MAGIC="gcc.*ivm64\|ivm64.*generated.*ld"
 
+# Lib counter (used to prefix object file names when they are extracted
+# from .ar or .so libraries)
+nobj=0
+
 # A script shebang to convert the output into an assembly executable,
 # that can execute itself by calling ivm (ivm must be in the PATH)
 # - Use END awk rule to execute ivm only once, not per line
@@ -269,12 +273,13 @@ main(){
     CRT0S=
     DCE=1
 
-    ARTMPDIR=`mktemp -d -p "${IVM64_LD_TMPDIR}"`
-    SOTMPDIR=`mktemp -d -p "${IVM64_LD_TMPDIR}"`
-    chmod go-wrx $ARTMPDIR $SOTMPDIR || kill -USR1 $$
+    DCETMPDIR=`mktemp -d -p "${IVM64_LD_TMPDIR}" tmp.DCE.XXXXXXXXX`
+    LLTMPDIR=`mktemp -d -p "${IVM64_LD_TMPDIR}"  tmp.LL.XXXXXXXXX`
+    OBJTMPDIR=`mktemp -d -p "${IVM64_LD_TMPDIR}" tmp.OBJ.XXXXXXXXX`
+    chmod go-wrx "$LLTMPDIR" "$OBJTMPDIR" "$DCETMPDIR" || kill -USR1 $$
 
     # Program the deletion of temporary dirs; it doesn't work on kill -9
-    trap 'cd /tmp/; ! test -z "$ARTMPDIR" && rm -rf $ARTMPDIR; ! test -z "$SOTMPDIR" && rm -rf $SOTMPDIR; test -f "$OUTPUTTMP" && rm -f "$OUTPUTTMP" ' EXIT HUP INT TERM QUIT
+    trap 'cd /tmp/; test -f "$OUTPUTTMP" && rm -f "$OUTPUTTMP" ; ! test -z "$LLTMPDIR" && rm -rf "$LLTMPDIR" ; ! test -z "$OBJTMPDIR" && rm -rf "$OBJTMPDIR" ; ! test -z "$DCETMPDIR" && rm -rf "$DCETMPDIR" ' EXIT HUP INT TERM QUIT
 
     # First, process library paths to get them in advance
     ARGS2=()
@@ -314,6 +319,8 @@ main(){
     # Process the remainder options
     nopt=0
     nso=0
+    nar=0
+    nobj=0
     while test $# -gt 0
     do
         if test "$1" == "-o"
@@ -327,15 +334,17 @@ main(){
             libfile="${libfilename}.a"
             libfile=$(in_path_list "$libfile" "$LIBDIRS")
             if ! test -z "$libfile"; then
-                # Add the lib file to the argument list
-                set -- "$@" "$libfile"
+                # Add the lib file to the argument list but in the same position that current $1
+                shift
+                set -- dummy "$libfile" "$@"
             else
                 # If libX.a not found, try libX.so
                 libfile="${libfilename}.so"
                 libfile=$(in_path_list "$libfile" "$LIBDIRS")
                 if ! test -z "$libfile"; then
-                    # Add the lib file to the argument list
-                    set -- "$@" "$libfile"
+                    # Add the lib file to the argument list but in the same position that current $1
+                    shift
+                    set -- dummy "$libfile" "$@"
                 else
                     >&2 echo "ld: Neither '$libfilename.a' nor '$libfilename.so' found ('$1' ignored)"
                     #kill -USR1 $$
@@ -373,26 +382,49 @@ main(){
                 if is_ar "$1"; then
                     # It is an ar file
                     ARFILES="$ARFILES $1"
-                    if test -z "$DCE"
-                    then
-                        arfile=`readlink -f "$1"`
-                        if pushd $ARTMPDIR >/dev/null; then
+                    arfile=`readlink -f "$1"`
+                    if pushd "$LLTMPDIR" >/dev/null; then
+                        mkdir -p ARTMP
+                        if pushd ARTMP >/dev/null; then
                             ar x "$arfile"
+                            arprefix=$(printf "obj%06d-ar-%05d-" $nobj $nar)
+                            frename "$arprefix" *
+                            find -size 0 -exec rm -f {} \;
                             popd >/dev/null
                         fi
+                        mv ARTMP/* . >& /dev/null
+                        rm -rf ARTMP
+                        popd >/dev/null
                     fi
+                    let nar=nar+1
+                    let nobj=nobj+1
                 elif has_extension "$1" 'so[.0-9]*'; then
+                    # It is an .so file, but for dce is another more library
+                    ARFILES="$ARFILES $1"
                     # It is a shared object file (.so, .so.1.1.0, ...)
                     sofile=`readlink -f "$1"`
-                    if pushd $SOTMPDIR >/dev/null; then
-                        csplit -f "so${nso}xx" -b '04%d.o' "$sofile" '/^##:ivm64:obj-id:/' '{*}' >& /dev/null
+                    if pushd $LLTMPDIR >/dev/null; then
+                        soprefix=$(printf "obj%06d-so-%05d-" $nobj $nso)
+                        csplit -f "${soprefix}" -b '%06d.o' "$sofile" '/^##:ivm64:obj-id:/' '{*}' >& /dev/null
+                        find -size 0 -exec rm -f {} \;
                         popd >/dev/null
                     fi
                     let nso=nso+1
-                    true
+                    let nobj=nobj+1
                 else
                     # It should be an assembly or object file
-                    OBJFILES="$OBJFILES $1"
+                    # Copy it to the corresponding temporary directory
+                    # with a numbered prefix to keep the order
+                    objprefix=$(printf "obj%06d-file-" $nobj)
+                    # Remove blank spaces in the name of the object when copying
+                    bn=`basename "$1"`
+                    bn=${bn// /_}
+                    OBJFILE="$OBJTMPDIR/${objprefix}${bn}"
+                    verbose   && cp -v "$1" "$OBJFILE" >&2
+                    ! verbose && cp    "$1" "$OBJFILE" >&2
+
+                    OBJFILES="$OBJFILES $OBJFILE"
+                    let nobj=nobj+1
                 fi
             else
                 >&2 echo "ld: File '$1' not found, ignoring it"
@@ -408,17 +440,37 @@ main(){
         if test -z "$DCE"
         then
             # No DCE: link all the objects in the libraries
-            OBJFILES="${OBJFILES} $(find ${ARTMPDIR}/ -type f 2>/dev/null) $(find ${SOTMPDIR}/ -type f 2>/dev/null)"
+            #OBJFILES="${OBJFILES} $(find ${LLTMPDIR}/ -type f 2>/dev/null | sort)"
+            ! test -z "$OBJFILES" && mv ${OBJFILES} ${LLTMPDIR}/  >&/dev/null
+            OBJFILES=`echo ${LLTMPDIR}/* | sort 2>/dev/null`
         else
+            # Objects in libraries that declare constructors or destructors
+            # must always be included
+            CTOROBJS="`grep -r -E -l '#:ivm64:#(C|D)TOR' "$LLTMPDIR" `"
+            verbose && >&2 echo -e "Ctors/Dtors found:\n$CTOROBJS"
+
             # DCE: link only required objects from the libraries
-            export DCETEMPDIR=$ARTMPDIR
-            MINIMALOBJS=`dce_do $ARFILES $SOTMPDIR/ -- $OBJFILES`
-            OBJFILES="${OBJFILES} ${MINIMALOBJS}"
+            export DCETEMPDIR=$DCETMPDIR
+            MINIMALOBJS=`dce_do $LLTMPDIR/ -- $OBJFILES $CTOROBJS`
+            MINIMALOBJS=`sort <<< "$MINIMALOBJS"`
+
+            OBJCOPYFILES=
+            if ! test -z "$OBJFILES"; then
+                for f in $OBJFILES; do
+                    newf="$DCETEMPDIR/`basename "$f"`"
+                    OBJCOPYFILES="$OBJCOPYFILES $newf"
+                done
+                verbose   && >&2 mv -v $OBJFILES "$DCETEMPDIR/"
+                ! verbose && >&2 mv    $OBJFILES "$DCETEMPDIR/"
+            fi
+
+            OBJFILES="${OBJCOPYFILES} ${MINIMALOBJS} ${CTOROBJS}"
+            OBJFILES="`echo ${OBJFILES} | tr ' ' $'\n' | sort`"
         fi
     fi
 
     if test -z "${OBJFILES}"; then
-        >&2 echo "No files to link"
+        >&2 echo "ld: no files to link"
         exit 1
     fi
 
@@ -691,7 +743,7 @@ is_asm() {
 } #Usage: is_asm filename
 
 is_ar(){
-    has_extension "$1" 'a' && [[ `file --mime-type -b -L "$1" ` =~ x-archive ]]
+    has_extension "$1" '(a|o)' && [[ `file --mime-type -b -L "$1" ` =~ x-archive ]]
 } #Usage: is_ar filename
 
 is_object() {
@@ -904,7 +956,7 @@ dce_signature() {
 #  Usage:
 #     # First export the temporary directory in environment
 #     # variable DCETEMPDIR
-#     dce_do lib1.a [lib2.a ...] [dir1 dir2 ...] -- file1.s file2.s ...
+#     dce_do lib1.(a|so) [lib2.(a|so) ...] [dir1 dir2 ...] -- file1.s file2.s ...
 #
 #---------------------------------------------------
 dce_do() {
@@ -924,6 +976,8 @@ dce_do() {
         exit 1
     fi
 
+    nar=0
+    nso=0
     while test $# -gt 0
     do
         if test "$1" == "--"; then
@@ -931,7 +985,7 @@ dce_do() {
             break
         fi
         if ! test -e "$1"; then
-            >&2 echo "Library or folder '$1' not found"
+            >&2 echo "DCE: Library or folder '$1' not found"
             kill -USR1 $$
             exit 1
         elif test -d "$1"; then
@@ -940,7 +994,35 @@ dce_do() {
             (cd "$TEMPDIR"; cp "${argdir}"/*.obj   . >& /dev/null)
         elif is_ar "$1"; then
             lib=`readlink -f "$1"`
-            (cd "$TEMPDIR"; ar x "$lib" )
+            #(cd "$TEMPDIR"; ar x "$lib" )
+            if pushd "$TEMPDIR" >/dev/null; then
+                mkdir -p ARTMP
+                if pushd ARTMP >/dev/null; then
+                    ar x "$lib"
+                    arprefix=$(printf "obj%06d-ar-%05d-" $nobj $nar)
+                    frename "$arprefix" *
+                    find -size 0 -exec rm -f {} \;
+                    popd >/dev/null
+                fi
+                find -size 0 -exec rm -f {} \;
+                mv ARTMP/* . >& /dev/null
+                rm -rf ARTMP
+                popd >/dev/null
+            fi
+            let nar=nar+1
+            let nobj=nobj+1
+        elif has_extension "$1" 'so[.0-9]*'; then
+            # It is a shared object file (.so, .so.1.1.0, ...)
+            sofile=`readlink -f "$1"`
+            if pushd "$TEMPDIR" >/dev/null; then
+                soprefix=$(printf "obj%06d-so-%05d-" $nobj $nso)
+                csplit -f "${soprefix}" -b '%06d.o' "$sofile" '/^##:ivm64:obj-id:/' '{*}' >& /dev/null
+                find -size 0 -exec rm -f {} \;
+                popd >/dev/null
+            fi
+            let nso=nso+1
+            let nobj=nobj+1
+            true
         else
             >&2 echo "Argument '$1' neither ar-file nor directory"
             kill -USR1 $$
@@ -950,12 +1032,11 @@ dce_do() {
     done
 
     LIBDIR="$TEMPDIR"
-    LIBFILES=$(find "${LIBDIR}" -name "*.o" -or -name "*.so" -or -name "*.obj" 2>/dev/null) # object files in libraries
+    LIBFILES=$(find "${LIBDIR}" -name "*.o" -or -name "*.so" -or -name "*.obj" | sort 2>/dev/null) # object files in libraries
 
     # Keep only one instance of files with the same contents
     # ignoring duplicates
     LIBFILES=`md5sum $LIBFILES | gawk '!uniq[substr($0,1,32)]++{print $2}'`
-
     # If there are no objects, do nothing
     if test -z "$LIBFILES"
     then
@@ -964,6 +1045,7 @@ dce_do() {
     fi
 
     verbose && >&2 echo "Processing objects in libraries ..."
+
     unset EXPORTPAT
     declare -A EXPORTPAT
 
@@ -979,7 +1061,14 @@ dce_do() {
     groupsz=7 # group size
     cnt=0
     cntg=0
-    for idx in ${!EXPORTPAT[@]}
+
+    # Traverse the array EXPORTPAT in alphabetical order
+    OLDIFS="$IFS"
+    IFS=$'\n'
+    EXPORTPATkeys=( $(for f in "${!EXPORTPAT[@]}"; do echo "$f"; done | sort) )
+    IFS="$OLDIFS"
+
+    for idx in "${EXPORTPATkeys[@]}"
     do
         cnt=$(( $cnt + 1 ))
         cntg=$(( $cnt / $groupsz ))
@@ -1054,6 +1143,23 @@ dce_do() {
     echo ${!DEPS[@]} |  tr " " $'\n' | sort
 }
 
+
+# A function to rename files by adding a prefix to them
+# Usage:
+#   frename "prefix" file1 file2 ...
+# Example:
+#   frename "aprefix-" *.o
+frename() {
+    test $# -lt 2 && return 1
+    prefix="$1";
+    shift;
+    # Try perl (faster)
+    if ! perl -e "foreach my \$f (@ARGV) {rename(\"\$f\",\"$prefix\$f\"); } " "$@" >& /dev/null
+    then
+        # If perl fails use the move command (slower)
+        for f in "$@"; do mv "$f" "${prefix}${f}"; done
+    fi
+}
 
 #---------------------------------------------------
 # Let's link

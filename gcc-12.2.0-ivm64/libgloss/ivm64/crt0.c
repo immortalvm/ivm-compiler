@@ -7,7 +7,7 @@
  *  Sergio Romero Montiel
  *  Oscar Plata Gonzalez
  *
- * Date: May 2020 - May 2023
+ * Date: May 2020 - Jul 2023
  *
  */
 
@@ -152,8 +152,9 @@ int main(int argc, char* argv[], char* environ[]);
 void exit(int status);
 void *memset(void *s, int c, long n);
 void *memcpy(void *dest, const void *src, long n); // newlib's memcpy does not check overlapping
-int strcmp(const char *, const char *);
 char *getenv(char *);
+int unsetenv(const char *name);
+long strtol(const char *nptr, char **endptr, int base);
 
 void __IVM64_do_global_ctors__();
 void __IVM64_do_global_dtors__();
@@ -269,50 +270,42 @@ long _start(void *args_start, unsigned long args_length, void *heap_start, ...) 
     __IVM64_heap_pointer__ = __heap_start; // from this point malloc() can be used
 
 
-/*
-// Debug
-for (int k=0; k<argc; k++){
-    printf("[%s:%s] argv[%d]=%s\n", __FILE__, __func__, k, argv[k]);
-}
-long e=0;
-while (environ[e] != NULL) {
-    printf("[%s:%s] (while)argv[%d]=%s\n", __FILE__, __func__, e, argv[e]);
-    e++;
-}
-for (int k=0; k<envc; k++){
-    printf("[%s:%s] environ[%d]=%s\n", __FILE__, __func__, k, environ[k]);
-}
-e=0;
-while (environ[e] != NULL) {
-    printf("[%s:%s] (while)environ[%d]=%s\n", __FILE__, __func__, e, environ[e]);
-    e++;
-}
-*/
+    // spawn program will find these environment variables
+    jmp_buf *spawn_jb_p = NULL;
+    char *jb_str = getenv("IVM_SPAWN_RETURN_JB");
+    if (jb_str) {
+        spawn_jb_p = (jmp_buf*)strtol(jb_str, NULL, 16);
+        unsetenv("IVM_SPAWN_RETURN_JB");
+    }
 
-    // Call constructors
-    __IVM64_do_global_ctors__();
+    int *spawn_val_p = NULL;
+    char *val_str = getenv("IVM_SPAWN_RETURN_VAL");
+    if (val_str) {
+        spawn_val_p = (int*)strtol(val_str, NULL, 16);
+        unsetenv("IVM_SPAWN_RETURN_VAL");
+    }
 
     // Call main
     if (__builtin_setjmp(jenv) == 0) {
+        // Call constructors before main
+        __IVM64_do_global_ctors__();
+        // Call main
         exit(main(argc, argv, NULL));
     }
 
-    // Call destructors
-    __IVM64_do_global_dtors__();
+    // As destructors can also call exit(), use setjmp again
+    if (__builtin_setjmp(jenv) == 0) {
+        // Call destructors
+        __IVM64_do_global_dtors__();
+    }
 
-    // Exit policy
-    // If environment variable IVM_CRT0_EXIT_POLICE=MUST_RETURN
-    // this function will return to the caller of its caller
+    // Return for spawned programs (to the caller)
+    // If environment variables IVM_SPAWN_RETURN_JB and IVM_SPAWN_RETURN_VAL are defined
+    // this function will return to the caller program using the longjump buffer
     // instead of returning normally.
-    // This makes sense if the binary is spawned by another
-    // ivm program (that is, if this is a spawned child of a parent)
-    char *exit_policy = getenv("IVM_CRT0_EXIT_POLICY");
-    if (exit_policy && (strcmp(exit_policy,"MUST_RETURN") == 0)) {
-        // Return to caller program instead of normal exit (halt)
-        *(ret + 1) = __IVM64_exit_val__;
-        asm volatile ("load8! %0"::"m"(ret));
-        asm volatile ("set_sp");
-        asm volatile ("jump");
+    if (spawn_jb_p && spawn_val_p) {
+        *spawn_val_p = __IVM64_exit_val__;
+        __builtin_longjmp(*spawn_jb_p, 1);
     }
 
     // Normal exit
@@ -333,4 +326,3 @@ void __IVM64_do_global_dtors__()
 {
     asm volatile("push"); // nop
 }
-

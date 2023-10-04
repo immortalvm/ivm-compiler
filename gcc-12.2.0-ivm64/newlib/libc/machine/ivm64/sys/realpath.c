@@ -78,7 +78,7 @@ static int resolve_path(char *path,char *result,char *pos)
 char *realpath(const char *__restrict path,char *__restrict resolved_path)
 {
     char cwd[PATH_MAX];
-    char *path_copy;
+    char path_copy[PATH_MAX];
     int res;
 
     if (!*path) {
@@ -98,10 +98,8 @@ char *realpath(const char *__restrict path,char *__restrict resolved_path)
     strcat(resolved_path,"/");
     #endif
 
-    path_copy = strdup(path);
-    if (!path_copy) return NULL;
+    strcpy(path_copy, path);
     res = resolve_path(path_copy,resolved_path,strchr(resolved_path,0));
-    free(path_copy);
     if (res) return NULL;
 
     #ifdef __ivm64__

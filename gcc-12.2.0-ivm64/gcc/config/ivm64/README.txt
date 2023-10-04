@@ -9,14 +9,28 @@ Building ivm64-gcc from sources
 Prerequisites
 -------------
 
+    Before building, read carefully instructions in https://gcc.gnu.org/install/.
+
     EITHER install the required packages described in
-           $GCC_SRCDIR/INSTALL/prerequisites.html for your system,
+        $GCC_SRCDIR/INSTALL/prerequisites.html for your system,
 
     OR build them from sources:
         cd "$GCC_SRCDIR"
         ./contrib/download_prerequisites
 
-Configuration for c and c++
+
+    The provided linking system is based on shellscripts.
+
+    The following common UNIX utilities are required:
+    bash, ar, gawk, sed, grep, egrep, file, which, find, sort, tr,
+    diffutils (cmp), coreutils (basename, dirname, md5sum, cut,
+    cat, true, readlink, csplit). Perl is also recommended because
+    it is used to speed up some actions.
+
+    At least version 4.4.20 of bash is required.
+
+    Also flex and bison are required in order to compile the assembler.
+
 -------------
 
     cd "$GCC_SRCDIR"
@@ -47,6 +61,7 @@ Configuration for c and c++
     --with-newlib \
     --with-libgloss \
     --enable-newlib-mb \
+    --enable-newlib-iconv \
     --disable-newlib-multithread \
     --disable-libstdcxx-filesystem-ts \
     --enable-sjlj-exceptions

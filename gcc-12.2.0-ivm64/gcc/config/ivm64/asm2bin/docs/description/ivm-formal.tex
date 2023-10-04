@@ -1,0 +1,102 @@
+\batchmode
+\documentclass[10pt,a4paper]{article}
+\usepackage{ucs}
+\usepackage[utf8x]{inputenc}
+
+%Warning: tipa declares many non-standard macros used by utf8x to
+%interpret utf8 characters but extra packages might have to be added
+%such as "textgreek" for Greek letters not already in tipa
+%or "stmaryrd" for mathematical symbols.
+%Utf8 codes missing a LaTeX interpretation can be defined by using
+%\DeclareUnicodeCharacter{code}{interpretation}.
+%Use coqdoc's option -p to add new packages or declarations.
+\usepackage{tipa}
+
+\usepackage[T1]{fontenc}
+\usepackage{fullpage}
+\usepackage{coqdoc}
+\usepackage{amsmath,amssymb}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{dsfont}
+\usepackage{hyperref}
+\usepackage{xspace}
+\usepackage{tikz-cd}
+
+\newcommand{\mathbbm}{\mathds}
+
+\newcommand{\FSharp}{\textsf{F\nolinebreak[4]\kern-.05em\raisebox{.2ex}{\small\#}}\xspace}
+
+\usepackage[parfill]{parskip}
+\setlength{\coqdocbaseindent}{2em}
+
+% Allow last line in paragraphs to fill width.
+\setlength{\parfillskip}{0pt plus 1fil}
+
+\let\oldCoqdocemptyline\coqdocemptyline
+\let\oldCoqdoceol\coqdoceol
+\renewcommand{\coqdocemptyline}{\par}
+\renewcommand{\coqdoceol}{\oldCoqdoceol\let\coqdocemptyline\oldCoqdocemptyline}
+\renewenvironment{coqdoccode}{\ignorespaces}{}
+
+\makeatletter
+% Inspired by https://tex.stackexchange.com/a/195498.
+\usepackage{pdftexcmds}
+\renewcommand{\coqdoctac}[1]{%
+  \ifnum\pdf@strcmp{\unexpanded{#1}}{in}=0 %
+    \expandafter\@firstoftwo
+  \else
+    \expandafter\@secondoftwo
+  \fi
+  {\coqdockw{in}}
+  {\coqdocvar{#1}}%
+}
+\makeatother
+
+\title{%
+  Formal Specification of VM and I/O devices\\
+  and description validation, version 2.0
+}
+\author{Ivar Rummelhoff\\
+\small Norsk Regnesentral/Norwegian Computing Center, P.O. Box 114 Blindern, NO-0314 Oslo, Norway }
+\date{2019-11-01, revised: 2020-04-17, 2020-12-14, 2023-05-25}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+The core of this document is a formal specification of the iVM abstract machine, version 1.1 (including \coqdocvar{CHECK}).
+Is has been formalized and mechanically checked using the \emph{Coq Proof Assistant}.
+The full source code is publicly available at:
+
+\begin{center}
+  \url{https://github.com/immortalvm/ivm-formal-spec}
+\end{center}
+
+The mathematical machine description in section~\ref{sec:formal} has been extracted from the Coq formalization.
+This section will be included on the Piql film together with the less formal ``How to Build a Machine'' and precise requirements for the necessary I/O devices.
+Here we shall define the \emph{interface} between these devices and the machine; but details concerning the devices themselves is beyond the scope of the current document.
+
+We have specified the machine using \emph{monads}, a mathematical concept much used in computer science.
+As a result, the specification resembles an implementation of the machine in a functional programming language.
+This makes it easy to confirm that O2.2 describes the same machine, provided the reader has a certain ``mathematical maturity''.
+Nevertheless, we have included precise definitions of all but the most basic conscepts in order to reduce the risk of misunderstandings.
+We also explain the Coq syntax when it is not obvious from the context and point out when we diverge from ``standard Coq'' in order to simplify the presentation
+(such as writing $\mathbbm{1}$ instead of $\coqdocvar{unit}$ for the type with one element).
+
+The iVM abstract machine is so simple that it is hard to write a C compiler targeting it directly.
+For this reason, we have defined an intermediate ``assembly language'' and an assembler which translates it into the machine language.
+Since this is a non-trivial transformation, we have also written a number of automatic tests for it.
+Instead of checking the assembler output directly, these tests run the resulting machine code on a prototype implementation of the abstract machine written in \FSharp.
+This is a functional programming language, so the prototype implementation is virtually identical to the specification below.
+As a consequence, the tests also confirm the ``sanity'' of the machine specification.
+
+Section~\ref{sec:formal} has been extracted from the Coq formalization using a modified version of the tool \texttt{coqdoc},
+which makes it possible to mix formalized mathematics with explanations in natural language.
+Details in the Coq code that are not necessary to understand the specification have been left out.
+The complete source code can be found at the URL mentioned above.
+
+\nonstopmode
+\include{ivm}
+\end{document}
