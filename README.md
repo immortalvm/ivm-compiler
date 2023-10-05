@@ -24,7 +24,7 @@ This project includes the current released version of the **IVM64 C/C++** compil
 
 Also it provides an assembler  (```ivm64-as```) to translate the _assembly executable_ produced by the compiler to binary.
 
-The last version is **ivm64-3.0**, which is based on **GNU CC v12.2.0**. It is suitable for the ivm64 architecture 2.0 (ivm v2.0).
+The last version is **ivm64-3.1**, which is based on **GNU CC v12.2.0**. It is suitable for the ivm64 architecture 2.0 (ivm v2.0).
 
 ## Features <a name="features"></a>
 
@@ -67,9 +67,10 @@ For more information about the toolchain see the slides in the folder ```docs```
 ## Requirements <a name="requirements"></a>
 
 The provided linking system is based on shellscripts.
-At least bash version 4.4.20 is required.
+At least ```bash``` version 4.4.20 is required.
 
-The following common UNIX utilities are required as well: ```bash, ar, gawk, sed, grep, egrep,    file, which, find, sort, tr, diffutils (cmp), coreutils (basename, dirname, md5sum, cut, cat, true, readlink, csplit)```
+The following common UNIX utilities are required as well: ```bash, ar, gawk, sed, grep, egrep,    file, which, find, sort, tr, diffutils (cmp), coreutils (basename, dirname, md5sum, cut, cat, true, readlink, csplit)```.
+The ```perl``` interpreter is recommended as well, because it is used to speed up some actions.
 
 Also _flex_ and _bison_ are required in order to compile the assembler.
 
