@@ -58,3 +58,6 @@ void *getpwnam(const char *name){errno=ENOENT; return NULL;}
 void *getpwuid(int uid){errno=ENOENT; return NULL;}
 
 mode_t umask(mode_t mask){return 0;}
+
+#include <sys/ioctl.h>
+int ioctl(int fd,  unsigned long request, ...){errno=ENOTTY; return -1;}

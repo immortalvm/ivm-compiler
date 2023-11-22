@@ -131,7 +131,7 @@ locallize(){
 
         substcmd_loc5="/${suffix_s}/ s/\(([[:space:]]*\(\(<=\|>=\|>>\|<<\|<\|>\|%\|\/\)\(s\|u\)\)\)${suffix_s}\([^[:alnum:]_\.]\|$\)/\1\5/g"
 
-        substcmd_loc_ctor="/^\(\s*EXPORT\s\+\(${Lo}\)\)/ s//#~ \0/g";
+        substcmd_loc_ctor="/^\(\s*EXPORT\s\+\(${Lo}\)\(\s\+\|$\)\)/ s//#~ \0/g";
     fi
     substcmd_loc6="s/\([[:space:]]\|=\|:\|)\|]\) /\1/g"
 
@@ -152,6 +152,72 @@ locallize(){
                         | sed "$substcmd_loc4" | sed "$substcmd_loc5" | sed "$substcmd_loc6" \
                         | sed "$substcmd_loc_ctor"
     fi
+}
+
+add_ctor_dtor_signature(){
+    gawk '  function md5sum(s) {
+                command="printf \"%s\" \"" s "\" | md5sum"
+                command | getline l
+                close(command)
+                split(l, ll, /[[:space:]]+/)
+                return ll[1]
+            }
+
+            BEGIN{
+                cur_fun_name = ""
+                infun = 0
+                fundfound = 0
+            }
+
+            /^#:ivm64:#FUNCTION_START/{
+                infun = 1
+                funfound = 0
+                cur_fun_name = ""
+            }
+
+            # Get the name of the function, as the first label after
+            # "FUNCTION_START" clause
+            (infun) && (!funfound) && /^\s*[A-Za-z0-9_.]+\s*:\s*$/{
+                funfound = 1;
+                split($0, f, / *: */)
+                cur_fun_name = f[1]
+                #print "# cur_fun_name='" cur_fun_name "'"
+            }
+
+            # Print and process a NON CTOR/DTOR statements
+            !/^#:ivm64:#(CTOR|DTOR)/{
+                print $0
+                if (cur_fun_name) {
+                    fbody[cur_fun_name] = fbody[cur_fun_name] "\n" $0
+                }
+            }
+
+            # Print a CTOR/DTOR clause followed by its signature
+            /^#:ivm64:#(CTOR|DTOR)/{
+                # input:
+                #     #:ivm64:#CTOR <fun_name> <prio>
+                # output:
+                #     #:ivm64:#CTOR <fun_name> <prio> <signatura>
+                split($0, s, / +/);
+                fname = s[2]
+                if (fname && fbody[fname]) {
+                    fsig = md5sum(fbody[fname])
+                } else {
+                    fsig = md5sum(fname)
+                }
+                print $1 " " $2 " " $3 " " fsig
+            }
+
+            /^#:ivm64:#FUNCTION_END/{
+                cur_fun_name = ""
+                infun = 0
+                funfound = 0
+            }
+
+            END {
+            }
+
+         ' "$@"
 }
 
 # First of all check requirements
@@ -229,6 +295,11 @@ verbose && >&2 echo "OBJECT=$OBJECT | ASM=$ASM | OBJID=$OBJID"
 # Assemble
 if test -f "$ASM"
 then
+    # Add signature to ctor/dtor clauses if any
+    ASMTMP="${ASM}_tmp_"
+    add_ctor_dtor_signature "$ASM" > "$ASMTMP"
+    mv "$ASMTMP" "$ASM"
+
     # Emulating assembling by copying
     echo -n                                                     > "$OBJECT"
     echo "##:ivm64:obj-id: ${OBJID}"                            >> "$OBJECT"

@@ -10,7 +10,7 @@
 
 ivm64dir=$(srcdir)/config/ivm64
 
-install: install-ivm64-binutils build-install-ivm64-as
+install: install-ivm64-binutils build-install-ivm64-as build-install-ivm64-fsgen
 	echo "Making t-ivm64 --------------------------------------------------------"
 	echo "ivm64dir="$(ivm64dir)
 	echo "srcdir="$(srcdir)
@@ -42,4 +42,10 @@ build-install-ivm64-as:
 	find  $(top_builddir)/ivm64/asm2bin/ -type f -executable -name "as*" -exec cp -vf {}  $(bindir)/asm2bin/ \;
 	cp -vf $(top_builddir)/ivm64/asm2bin/ivm64-as $(bindir)/
 	chmod +x $(bindir)/ivm64-as
+
+build-install-ivm64-fsgen:
+	echo "t-ivm64 copying ivm filesystem generator 'ivm64-fsgen' -----------------------------"
+	mkdir -p $(bindir)
+	cp -vf $(ivm64dir)/ivm64-fsgen $(bindir)/ivm64-fsgen
+	chmod +x $(bindir)/ivm64-fsgen
 

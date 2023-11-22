@@ -181,7 +181,7 @@ int ivm64_peep_enabled(enum ivm64_peephole2 peep)
         IVM64_SET_PEEP(IVM64_PEEP2_POP_NOP_PUSH,                    1);
         IVM64_SET_PEEP(IVM64_PEEP2_MOV_PUSH,                        1);
         IVM64_SET_PEEP(IVM64_PEEP2_MOV_PUSH_POP_PUSH_POP,           1);
-        IVM64_SET_PEEP(IVM64_PEEP2_CALL_PUSH_AR,                    1);
+        IVM64_SET_PEEP(IVM64_PEEP2_CALL_PUSH_AR,                    0);
         IVM64_SET_PEEP(IVM64_PEEP2_PUSH_BINOP,                      1);
         IVM64_SET_PEEP(IVM64_PEEP2_PUSH_POP_PUSH_BINOP_MULTIMODE,   1);
         IVM64_SET_PEEP(IVM64_PEEP2_PUSH_INDPUSH_ZERO_EXTEND,        1);
@@ -366,7 +366,6 @@ int is_noreturn(rtx call_insn){
 
 /* Return the REG_ARGS_SIZE annotation value. */
 bool ivm64_reg_args_size(rtx pusharg_insn, HOST_WIDE_INT *reg_args_size){
-    HOST_WIDE_INT ret;
     rtx note = find_reg_note (pusharg_insn, REG_ARGS_SIZE, NULL_RTX);
     if (note != NULL_RTX && CONSTANT_P(XEXP(note,0))) {
         *reg_args_size = INTVAL(XEXP(note,0));
@@ -2122,7 +2121,7 @@ static void ivm64_asm_function_epilogue(FILE *file)
     }
 
     fprintf(file, "\n");
-    fprintf(file, ASM_COMMENT_START " FUNCTION ENDS: %s\n\n", current_function_name());
+    fprintf(file, ASM_COMMENT_START " FUNCTION ENDS: %s\n" "#:ivm64:#FUNCTION_END\n" "\n", current_function_name());
 
     fflush(NULL);
 }
@@ -2155,21 +2154,24 @@ static bool ivm64_can_inline_p(tree caller ATTRIBUTE_UNUSED,
 }
 #endif
 
-static void ivm64_asm_out_ctor (rtx symbol ATTRIBUTE_UNUSED,
-                                int priority ATTRIBUTE_UNUSED)
+static void ivm64_asm_out_ctor (rtx symbol,
+                                int priority)
 {
     fputs ("#\t.global __do_global_ctors\n", asm_out_file);
     if (GET_CODE(symbol) == SYMBOL_REF){
-        fprintf(asm_out_file, "#:ivm64:#CTOR %s\n", XSTR(symbol, 0));
+        // If the target supports initialization priorities, priority is a
+        // value between 0 and MAX_INIT_PRIORITY; otherwise it must be
+        // DEFAULT_INIT_PRIORITY
+        fprintf(asm_out_file, "#:ivm64:#CTOR %s %05d\n", XSTR(symbol, 0), priority);
     }
 }
 
-static void ivm64_asm_out_dtor (rtx symbol ATTRIBUTE_UNUSED,
-                                int priority ATTRIBUTE_UNUSED)
+static void ivm64_asm_out_dtor (rtx symbol,
+                                int priority)
 {
     fputs ("#\t.global __do_global_dtors\n", asm_out_file);
     if (GET_CODE(symbol) == SYMBOL_REF){
-        fprintf(asm_out_file, "#:ivm64:#DTOR %s\n", XSTR(symbol, 0));
+        fprintf(asm_out_file, "#:ivm64:#DTOR %s %05d\n", XSTR(symbol, 0), priority);
     }
 }
 

@@ -22,14 +22,14 @@
 #define TARGET_CPU_CPP_BUILTINS() ivm64_cpu_cpp_builtins(pfile)
 
 /* This macro is used by ivm.c:ivm64_asm_file_start() */
-#define IVM64_GCC_VERSION "3.1"
+#define IVM64_GCC_VERSION "3.2"
 #define VERSION_INFO "GCC Cross Compiler for ivm64, version " IVM64_GCC_VERSION " (" __DATE__ ", " __TIME__ ")"
 
 
 /** SOME PER-FUNCTION INITIALIZATION **/
 
 #define ASM_OUTPUT_FUNCTION_PREFIX(FILE, NAME) \
-  fprintf(FILE, "\n" ASM_COMMENT_START " FUNCTION BEGINS: %s\n", current_function_name())
+  fprintf(FILE, "\n" "#:ivm64:#FUNCTION_START\n" ASM_COMMENT_START " FUNCTION BEGINS: %s\n", current_function_name())
 
 /* Macro called to initialize any target specific information.  This macro is
    called onceper function, before generation of any RTL has begun.  The
@@ -1052,6 +1052,10 @@ do { \
 #define IVM64_OMIT_DEFER_POP_MESSAGE 1
 
 #define IVM64_NON_BUILTIN_ALLOCA 1
+
+#undef SUPPORTS_INIT_PRIORITY
+#define SUPPORTS_INIT_PRIORITY 1
+
 
 /* Peephole control */
 enum ivm64_peephole2 {

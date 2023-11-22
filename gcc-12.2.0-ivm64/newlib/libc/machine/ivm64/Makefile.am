@@ -12,7 +12,7 @@ noinst_LIBRARIES = lib.a
 lib_a_SOURCES = setjmp.c alloca.c string/memccpy.c  string/memchr.c  string/memcmp.c  string/memcpy.c \
 				 string/memmove.c  string/mempcpy.c  string/memrchr.c  string/memset.c  string/rawmemchr.c  string/stpncpy.c \
 				 string/stpcpy.c  string/strchr.c  string/strcmp.c  string/strcpy.c  string/strlen.c  string/strncmp.c  string/strncpy.c \
-				 sys/realpath.c sys/getwd.c sys/basename.c sys/dirname.c
+				 sys/realpath.c sys/getwd.c sys/basename.c sys/dirname.c sys/termios.c
 lib_a_CCASFLAGS=$(AM_CCASFLAGS)
 lib_a_CFLAGS=$(AM_CFLAGS)
 

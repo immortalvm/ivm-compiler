@@ -782,19 +782,22 @@ installdirs-am:
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 #*ivm64
-install: preinstall-libgloss install-recursive
+#install: install-recursive
+install: newinstall-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
 uninstall: uninstall-recursive
 
+#*ivm64 target 'preinstall-libgloss' must be executed before 'install-recursive'
+newinstall-recursive:  preinstall-libgloss
+	+make install-recursive
 
 #*ivm64 Include libgloss into libc
 #TODO: add correct directory variables instead of fixed paths
+IVM_FSGEN := $(dir $(LD_FOR_TARGET))/ivm64-fsgen
 preinstall-libgloss:
+	-which $(IVM_FSGEN) && $(IVM_FSGEN) > ../libgloss/ivm64/00-ivmfs-empty.c && $(CC_FOR_NEWLIB) -c ../libgloss/ivm64/00-ivmfs-empty.c -o ../libgloss/ivm64/00-ivmfs-empty.o &&  $(AR) r libc/libc.a ../libgloss/ivm64/00-ivmfs-empty.o
 	$(AR) r libc/libc.a ../libgloss/ivm64/chown.o  ../libgloss/ivm64/close.o  ../libgloss/ivm64/crt0.o  ../libgloss/ivm64/_execve.o  ../libgloss/ivm64/_exit.o  ../libgloss/ivm64/fork.o  ../libgloss/ivm64/fstat.o  ../libgloss/ivm64/getpid.o  ../libgloss/ivm64/gettod.o  ../libgloss/ivm64/isatty.o  ../libgloss/ivm64/kill.o  ../libgloss/ivm64/link.o  ../libgloss/ivm64/lseek.o  ../libgloss/ivm64/open.o  ../libgloss/ivm64/posix.o  ../libgloss/ivm64/printk.o  ../libgloss/ivm64/read.o  ../libgloss/ivm64/readlink.o  ../libgloss/ivm64/sbrk.o  ../libgloss/ivm64/stat.o  ../libgloss/ivm64/symlink.o  ../libgloss/ivm64/times.o  ../libgloss/ivm64/unlink.o  ../libgloss/ivm64/wait.o  ../libgloss/ivm64/write.o
-
-
-
 
 install-am: all-am
 	@$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am

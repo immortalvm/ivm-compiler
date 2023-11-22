@@ -77,7 +77,8 @@ am_lib_a_OBJECTS = lib_a-setjmp.$(OBJEXT) lib_a-alloca.$(OBJEXT) \
 	lib_a-stpncpy.$(OBJEXT) lib_a-stpcpy.$(OBJEXT) lib_a-strchr.$(OBJEXT) \
 	lib_a-strcmp.$(OBJEXT) lib_a-strcpy.$(OBJEXT) lib_a-strlen.$(OBJEXT) \
 	lib_a-strncmp.$(OBJEXT) lib_a-strncpy.$(OBJEXT)  lib_a-realpath.$(OBJEXT) \
-	lib_a-getwd.$(OBJEXT) lib_a-dirname.$(OBJEXT)  lib_a-basename.$(OBJEXT)
+	lib_a-getwd.$(OBJEXT) lib_a-dirname.$(OBJEXT)  lib_a-basename.$(OBJEXT) \
+    lib_a-termios.$(OBJEXT)
 lib_a_OBJECTS = $(am_lib_a_OBJECTS)
 DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp =
@@ -206,7 +207,7 @@ noinst_LIBRARIES = lib.a
 lib_a_SOURCES = setjmp.c alloca.c string/memccpy.c string/memchr.c string/memcmp.c string/memcpy.c \
 				string/memmove.c string/mempcpy.c string/memrchr.c string/memset.c string/rawmemchr.c string/stpncpy.c \
 				string/stpcpy.c string/strchr.c string/strcmp.c string/strcpy.c string/strlen.c string/strncmp.c string/strncpy.c \
-				sys/realpath.c sys/getwd.c sys/basename.c sys/dirname.c
+				sys/realpath.c sys/getwd.c sys/basename.c sys/dirname.c sys/termios.c
 lib_a_CCASFLAGS = $(AM_CCASFLAGS)
 lib_a_CFLAGS = $(AM_CFLAGS)
 ACLOCAL_AMFLAGS = -I ../../.. -I ../../../..
@@ -345,6 +346,9 @@ lib_a-basename.o:  $(srcdir)/sys/basename.c
 
 lib_a-dirname.o:  $(srcdir)/sys/dirname.c
 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-dirname.o `test -f 'sys/dirname.c' || echo '$(srcdir)/sys/'`dirname.c
+
+lib_a-termios.o:  $(srcdir)/sys/termios.c
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(lib_a_CFLAGS) $(CFLAGS) -c -o lib_a-termios.o `test -f 'sys/termios.c' || echo '$(srcdir)/sys/'`termios.c
 
 ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	list='$(SOURCES) $(HEADERS) $(LISP) $(TAGS_FILES)'; \

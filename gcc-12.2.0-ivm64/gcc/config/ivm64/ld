@@ -643,10 +643,13 @@ EOCRT0
         fi
 
         # Processing initialization functions for c++
-        # Replicated ctor/dtor macros are removed
-        CTORCALLS=`gawk '/^#:ivm64:#CTOR/{if (! ($2 in uniq)) {uniq[$2]=1; printf("call! %s\\\\n", $2);} }' "$OUTPUT"`
+        # Clauses for ctor/dtor are of the form "#:ivm64:#CTOR <name_of_the_funcion> <priority> <signature>"
+        # Replicated ctor/dtor are removed
+        CTORCALLS=`gawk '/^#:ivm64:#CTOR/{prio=$3; sig=$4?$4:$2; if (! (sig in uniq)) {uniq[sig]=1; prios[prio]=1; calls[prio]=calls[prio] sprintf(" call! %s  #prio=%s\\\\n", $2, prio); } } END{ n = asorti(prios, key_s); for(i=1; i<=n; i++){ printf("%s", calls[key_s[i]]); } } ' "$OUTPUT"`
+
         # Print destructors in reverse appearance order
-        DTORCALLS=`gawk 'BEGIN{l=0} /^#:ivm64:#DTOR/{if (! ($2 in uniq)) {uniq[$2]=1; list[l]=sprintf("call! %s\\\\n", $2);  l++} } END{for (k=l-1; k>=0; k--){printf(list[k]);}}' "$OUTPUT"`
+        DTORCALLS=`gawk 'BEGIN{l=0} /^#:ivm64:#DTOR/{prio=$3; sig=$4?$4:$2; if (! (sig in uniq)) {uniq[sig]=1; prios[prio]=1; calls[prio][l]=sprintf(" call! %s  #prio=%s\\\\n", $2, prio);  l++} } END{n=asorti(prios, key_s); for(i=n; i>=1; i--){ for (k=l-1; k>=0; k--){printf("%s", calls[key_s[i]][k]);} } }' "$OUTPUT"`
+
 
         #sed -E -i "s/^\s*call! main\s*(|#.*)$/\n${CTORCALLS}\ncall! main\n\n${DTORCALLS}\n/" "$OUTPUT"
 

@@ -19,13 +19,6 @@
 ;; The peephole2 pass is run after register allocation but before scheduling,
 ;; which may result in much  better code for targets that do scheduling.
 
-(define_mode_iterator QIHISI1 [QI HI SI])
-(define_mode_iterator QIHISI2 [QI HI SI])
-(define_mode_iterator QIHISIDI1 [QI HI SI DI])
-(define_mode_iterator QIHISIDI2 [QI HI SI DI])
-(define_mode_iterator ALLMODES1 [DI SI HI QI SF DF])
-(define_mode_iterator ALLMODES2 [DI SI HI QI SF DF])
-
 ;; -----------------------------------------------
 ;; TR <- r0 (r0 dead)
 ;; r0 <- TR
@@ -1712,6 +1705,7 @@
 ;; -----------------------------------------------
 ;; (empty stack)
 ;; AR <- call(a,b,...) (npopargs = no. of bytes of arguments)
+;;                     (no EH region)
 ;; p4 <- AR (AR dead)
 ;;      => call()
 ;;         p4 <- TR
@@ -1738,6 +1732,8 @@
      && peep2_reg_dead_p(2, operands[0])
      && (!reg_mentioned_p(operands[0], operands[4]))
      && (INTVAL(operands[3]) >= UNITS_PER_WORD)
+     && (!find_reg_note(peep2_next_insn(0), REG_EH_REGION, NULL_RTX)) /* No EH_REGION */
+     && (!INSN_ANNULLED_BRANCH_P(peep2_next_insn(0))) /* No flag /u in call */
      && ivm64_reg_args_size_is_zero(peep2_next_insn(0)) /* If some arguments have been already pushed, this peephole is not applicable */
    )"
    [
@@ -1782,6 +1778,7 @@
 ;; -----------------------------------------------
 ;; (empty stack)
 ;; AR <- call(a,b,...) (npopargs = no. of bytes of arguments)
+;;                     (no EH region)
 ;; mem[SP--] <- AR (AR dead)
 ;;      => call()
 ;;         mem[ ] <- ...
@@ -1807,6 +1804,8 @@
      && (REGNO(operands[0]) == AR_REGNUM)
      && peep2_reg_dead_p(2, operands[0])
      && (INTVAL(operands[3]) >= 2*UNITS_PER_WORD)
+     && (!find_reg_note(peep2_next_insn(0), REG_EH_REGION, NULL_RTX)) /* No EH_REGION */
+     && (!INSN_ANNULLED_BRANCH_P(peep2_next_insn(0))) /* No flag /u in call */
      && ivm64_reg_args_size_is_zero(peep2_next_insn(0)) /* If some arguments have been already pushed, this peephole is not applicable */
    )"
    [
@@ -1852,6 +1851,7 @@
 ;; -----------------------------------------------
 ;; (empty stack)
 ;; AR <- call(a) (only one argument)
+;;               (no EH region)
 ;; mem[SP--] <- AR (AR dead)
 ;;      => call()
 ;; -----------------------------------------------
@@ -1875,6 +1875,8 @@
      && (REGNO(operands[0]) == AR_REGNUM)
      && peep2_reg_dead_p(2, operands[0])
      && (INTVAL(operands[3]) == UNITS_PER_WORD)
+     && (!find_reg_note(peep2_next_insn(0), REG_EH_REGION, NULL_RTX)) /* No EH_REGION */
+     && (!INSN_ANNULLED_BRANCH_P(peep2_next_insn(0))) /* No flag /u in call */
      && ivm64_reg_args_size_is_zero(peep2_next_insn(0)) /* If some arguments have been already pushed, this peephole is not applicable */
    )"
    [

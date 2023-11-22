@@ -984,5 +984,12 @@
 ;; Peephole optimization
 ;;-------------------------------------------------------------------------
 
+(define_mode_iterator QIHISI1 [QI HI SI])
+(define_mode_iterator QIHISI2 [QI HI SI])
+(define_mode_iterator QIHISIDI1 [QI HI SI DI])
+(define_mode_iterator QIHISIDI2 [QI HI SI DI])
+(define_mode_iterator ALLMODES1 [DI SI HI QI SF DF])
+(define_mode_iterator ALLMODES2 [DI SI HI QI SF DF])
+
 (include "peephole.md")
 
