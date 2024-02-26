@@ -24,7 +24,7 @@ This project includes the current released version of the **IVM64 C/C++** compil
 
 Also it provides an assembler  (```ivm64-as```) to translate the _assembly executable_ produced by the compiler to binary.
 
-The last version is **ivm64-3.2**, which is based on **GNU CC v12.2.0**. It is suitable for the ivm64 architecture 2.0 (ivm v2.0).
+The last version is **ivm64-3.3**, which is based on **GNU CC v12.2.0**. It is suitable for the ivm64 architecture 2.1 (ivm v2.1).
 
 ## Features <a name="features"></a>
 

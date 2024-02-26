@@ -24,18 +24,4 @@
 #endif
 #endif
 
-#ifdef __ivm64__
-#ifndef __cplusplus
-#   define getline __getline
-#   define getdelim __getdelim
-#else
-extern "C" {
-extern ssize_t __getline(char **lineptr, size_t *n, FILE *stream);
-extern ssize_t __getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
-static ssize_t getline(char **lineptr, size_t *n, FILE *stream) {return __getline(lineptr, n, stream);}
-static ssize_t getdelim(char **lineptr, size_t *n, int delim, FILE *stream) {return __getdelim(lineptr, n, delim, stream);}
-}
-#endif
-#endif
-
 #endif /* _NEWLIB_STDIO_H */

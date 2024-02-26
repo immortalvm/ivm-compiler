@@ -773,6 +773,38 @@
   }
 )
 
+;; These two rules  "save_stack_function" and "restore_stack_function" embrace the body
+;; of a function that involves alloca(). In this way, the bytes allocated with malloc(),
+;; by our implementation of alloca(), are freed before calling the epilogue of the
+;; function
+(define_expand "save_stack_function"
+  [(match_operand 0 "general_operand" "") ;; the returned pointer ??
+   (match_operand 1 "general_operand" "") ;; stack pointer
+  ]
+  "IVM64_NON_BUILTIN_ALLOCA"
+  {
+    ivm64_expand_void_fun_1arg(operands, "__ivm64_alloca_enter", 0);
+    DONE;
+  }
+)
+
+(define_expand "restore_stack_function"
+  [(match_operand 0 "general_operand" "") ;; stack pointer
+   (match_operand 1 "general_operand" "") ;; pointer where the stack was saved
+  ]
+  "IVM64_NON_BUILTIN_ALLOCA"
+  {
+    ivm64_expand_void_fun_1arg(operands, "__ivm64_alloca_exit", 0);
+    ivm64_expand_void_fun_1arg(operands, "__ivm64_alloca_free", 0);
+    DONE;
+  }
+)
+
+;; DO NOT DEFINE patterns "save_stack_nonlocal" and "restore_stack_nonlocal".
+;; They does not only make sense in our implementation, but in fact it will
+;; break the code execution if these patterns are defined.
+
+
 (define_expand "builtin_longjmp"
   ;; only using the first argument; the second one is always 1
   [(match_operand 0 "general_operand" "")]

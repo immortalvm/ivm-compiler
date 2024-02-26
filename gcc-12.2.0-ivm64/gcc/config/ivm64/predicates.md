@@ -83,6 +83,7 @@
 )
 
 
+
 ;; An arithmetic operand can be printed as a simple argument
 ;; of an ivm arithmetic instruction like "add! &2".
 ;; This includes immediates, labels, GPRs and mem[SP+offset]
@@ -92,7 +93,7 @@
     return immediate_operand(op, mode)
            || (REG_P(op) && (IS_GP_REGNUM(REGNO(op))
                              || REGNO(op) == TR_REGNUM
-                             || (REGNO(op) > LAST_VIRTUAL_REGISTER)
+                             || (REGNO(op) >= FIRST_VIRTUAL_REGISTER)
                             ))
            || (GET_CODE(op) == MEM && PC_OR_STACK_RELATIVE_P(XEXP(op, 0)))
     ;

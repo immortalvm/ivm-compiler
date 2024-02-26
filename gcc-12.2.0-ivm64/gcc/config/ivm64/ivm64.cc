@@ -770,7 +770,7 @@ void ivm64_expand_save_stack_block(rtx *operands ATTRIBUTE_UNUSED)
 {
     rtx push_stack_save_operand = gen_pushdi1(GEN_INT(0));
     rtx fnaddr = gen_rtx_MEM(DImode,
-                        gen_rtx_SYMBOL_REF(Pmode, "_builtin_stack_save_ivm64"));
+                        gen_rtx_SYMBOL_REF(Pmode, "__builtin_stack_save_ivm64"));
     rtx ret_reg = gen_rtx_REG(Pmode, AR_REGNUM);
     rtx arg_bytes = GEN_INT(GET_MODE_SIZE(DImode));
     rtx call_stack_save = gen_call_value_pop(ret_reg, fnaddr, arg_bytes, NULL, arg_bytes);
@@ -783,7 +783,33 @@ void ivm64_expand_restore_stack_block(rtx *operands ATTRIBUTE_UNUSED)
 {
     rtx push_stack_restore_operand = gen_pushdi1(GEN_INT(0));
     rtx fnaddr = gen_rtx_MEM(DImode,
-                      gen_rtx_SYMBOL_REF(Pmode, "_builtin_stack_restore_ivm64"));
+                      gen_rtx_SYMBOL_REF(Pmode, "__builtin_stack_restore_ivm64"));
+    rtx arg_bytes = GEN_INT(GET_MODE_SIZE(DImode));
+    rtx call_stack_restore = gen_call_pop(fnaddr, arg_bytes, NULL, arg_bytes);
+
+    emit_insn(push_stack_restore_operand);
+    emit_insn(call_stack_restore);
+}
+
+/* Expand the call "function_name()" for a function with prototype:
+   "void function_name()" */
+void ivm64_expand_void_fun_0arg(rtx *operands ATTRIBUTE_UNUSED,const char *function_name)
+{
+
+    rtx fnaddr = gen_rtx_MEM(DImode, gen_rtx_SYMBOL_REF(Pmode, function_name));
+    rtx call_stack_restore = gen_call(fnaddr, const0_rtx);
+    emit_insn(call_stack_restore);
+}
+
+
+/* Expand the call "function_name(value)", being 'value' an integer,
+   for a function with prototype: "void function_name(long arg)" */
+void ivm64_expand_void_fun_1arg(rtx *operands ATTRIBUTE_UNUSED,
+                                const char *function_name, long value)
+{
+    rtx push_stack_restore_operand = gen_pushdi1(GEN_INT(value));
+    rtx fnaddr = gen_rtx_MEM(DImode,
+                      gen_rtx_SYMBOL_REF(Pmode, function_name));
     rtx arg_bytes = GEN_INT(GET_MODE_SIZE(DImode));
     rtx call_stack_restore = gen_call_pop(fnaddr, arg_bytes, NULL, arg_bytes);
 
@@ -2121,6 +2147,9 @@ static void ivm64_asm_function_epilogue(FILE *file)
     }
 
     fprintf(file, "\n");
+    if (cfun && cfun->calls_alloca){
+        fprintf(file, ASM_COMMENT_START " FUNCTION CALLS ALLOCA\n");
+    }
     fprintf(file, ASM_COMMENT_START " FUNCTION ENDS: %s\n" "#:ivm64:#FUNCTION_END\n" "\n", current_function_name());
 
     fflush(NULL);
@@ -2614,6 +2643,7 @@ static bool ivm64_get_cfun_volatil_ret(){
 }
 
 
+
 /* Initialize the GCC target structure.  */
 
 /* These hooks specify assembly directives for creating certain kinds of
@@ -2732,6 +2762,14 @@ static bool ivm64_get_cfun_volatil_ret(){
     #define TARGET_HAVE_ALLOCATE_STACK     hook_bool_void_true
     #undef TARGET_CODE_FOR_ALLOCATE_STACK
     #define TARGET_CODE_FOR_ALLOCATE_STACK CODE_FOR_call_alloca
+
+//*e EXPERIMENTAL
+//#undef TARGET_HAVE_RESTORE_STACK_FUNCTION
+//#define TARGET_HAVE_RESTORE_STACK_FUNCTION hook_bool_void_true
+//#undef TARGET_CODE_FOR_RESTORE_STACK_FUNCTION
+//#define TARGET_CODE_FOR_RESTORE_STACK_FUNCTION CODE_FOR_restore_stack_function
+
+
 #endif
 
 #define TARGET_FUNCTION_OK_FOR_SIBCALL hook_bool_tree_tree_false

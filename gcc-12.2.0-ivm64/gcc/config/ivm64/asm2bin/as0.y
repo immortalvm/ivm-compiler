@@ -6,8 +6,8 @@
        Jan 2022
     */
 
-    #define IVM64_BISON_AS_VERSION "v2.0"
-    #define IVM64_ARCHITECTURE "ivm-v2.0"
+    #define IVM64_BISON_AS_VERSION "v2.1"
+    #define IVM64_ARCHITECTURE "ivm-v2.1"
 
     #include <stdio.h>
     int yylex(void);

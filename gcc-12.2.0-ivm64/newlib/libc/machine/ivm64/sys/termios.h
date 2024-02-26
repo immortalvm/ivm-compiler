@@ -108,6 +108,12 @@ struct termios {
 	speed_t		c_ospeed;
 };
 
+
+/* grr, this shouldn't have to be here */
+int tcgetattr(int fd,struct termios *termios_p);
+int tcsetattr(int fd,int optional_actions,const struct termios *termios_p);
+
+
 # ifndef _NO_MACROS
 
 #  define cfgetospeed(tp)	((tp)->c_ospeed)

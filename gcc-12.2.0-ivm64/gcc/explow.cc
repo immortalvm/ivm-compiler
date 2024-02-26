@@ -1380,9 +1380,18 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
   /* Otherwise, show we're calling alloca or equivalent.  */
   cfun->calls_alloca = 1;
 
-#if (IVM64_NON_BUILTIN_ALLOCA == 1)
-  cfun->calls_alloca = 0;
-#endif
+//-- IVM64: This is not needed any more as calls_alloca can be safely set to 1
+//-- if patterns "save_stack_function" and "restore_stack_function"
+//-- are defined in ivm64.md
+//-- #if (IVM64_NON_BUILTIN_ALLOCA == 1)
+//--   // Make gcc think we have no alloca, in order to generate calls
+//--   // to alloca() function, instead of a sequence of SP manipulations
+//--   cfun->calls_alloca = 0;
+//--
+//--   // But save this fact as internal machine information for the target
+//--   extern void ivm64_set_cfun_has_alloca(bool b);
+//--   if (cfun && cfun->machine) ivm64_set_cfun_has_alloca(1);
+//-- #endif
 
 
   /* If stack usage info is requested, look into the size we are passed.
@@ -1595,7 +1604,11 @@ allocate_dynamic_stack_space (rtx size, unsigned size_align,
   mark_reg_pointer (target, required_align);
 
   /* Record the new stack level.  */
+#if (!(IVM64_NON_BUILTIN_ALLOCA))
+//-- IVM64 alloca implementation is based on malloc(), therefore 
+//-- recording the stack level is not necessary
   record_new_stack_level ();
+#endif
 
   return target;
 }

@@ -59,7 +59,8 @@ extern void ivm64_expand_builtin_longjump_inline(rtx *operands);
 extern void ivm64_expand_call_alloca(rtx *operands);
 extern void ivm64_expand_save_stack_block(rtx *operands);
 extern void ivm64_expand_restore_stack_block(rtx *operands);
-
+extern void ivm64_expand_void_fun_0arg(rtx *operands, const char *function_name);
+extern void ivm64_expand_void_fun_1arg(rtx *operands, const char *function_name, long value);
 /* Output functions */
 
 extern void ivm64_output_ascii (FILE *file, const char *ptr, int len);
