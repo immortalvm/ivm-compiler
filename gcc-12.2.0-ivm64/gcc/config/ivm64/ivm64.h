@@ -22,7 +22,7 @@
 #define TARGET_CPU_CPP_BUILTINS() ivm64_cpu_cpp_builtins(pfile)
 
 /* This macro is used by ivm.c:ivm64_asm_file_start() */
-#define IVM64_GCC_VERSION "3.3"
+#define IVM64_GCC_VERSION "3.4"
 #define VERSION_INFO "GCC Cross Compiler for ivm64, version " IVM64_GCC_VERSION " (" __DATE__ ", " __TIME__ ")"
 
 

@@ -276,14 +276,17 @@ as_get_first_symbol() {
     echo "$E"
 }
 
+as_get_a_signature() {
+    local N=2048
+    local md5=($(head -c $N "$1" | md5sum))
+    echo -n $md5
+}
+
 # A unique object id to be appended as suffix to local labels
 FILENAME=`as_get_filename "$ASM"`
 if ! test -z "$FILENAME"; then
     export OBJID="$FILENAME"
-    PREF=`as_get_first_symbol "$ASM"`
-    if ! test -z "$PREF"; then
-        OBJID=`echo "$PREF" | md5sum | cut -b1-3`.$OBJID
-    fi
+    OBJID=`as_get_a_signature "$ASM" | cut -b1-3`.$OBJID
 else
     export OBJID=o`echo "$OBJECT" | md5sum | cut -b1-6`
 fi
